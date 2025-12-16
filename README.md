@@ -2,7 +2,7 @@
 
 Packaged-JMeter allows developers to have unified JMeter directory structure in their projects, automatic handling of plugins based on projects' configuration and a defined pattern for execution reports. 
 
-[![CI](<badge-url>)](<ci-url>)
+[![CI](https://github.com/vduda-zirnitra/pjmeter/actions/workflows/ci.yml/badge.svg)](https://github.com/vduda-zirnitra/pjmeter/actions/workflows/ci.yml)
 
 ## Features
 - Command-line interface built in Rust
