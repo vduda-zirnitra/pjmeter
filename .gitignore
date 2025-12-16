@@ -1,0 +1,22 @@
+# Rust/Cargo
+/target/
+/Cargo.lock
+/.sqlx/
+/build/
+
+# Development folders
+/.sandbox/
+/.jmeter-app/
+
+# VSCode settings
+.vscode/
+
+# IntelliJ IDEA settings
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Test outputs
+/results/
