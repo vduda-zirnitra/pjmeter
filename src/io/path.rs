@@ -55,7 +55,7 @@ pub fn list_plan_files(project_dir_path: &str) -> Vec<String> {
     let mut jmx_files = Vec::new();
     let entries = match fs::read_dir(project_dir_path) {
         Ok(entries) => entries,
-        Err(_) => return jmx_files, // Retourne un vecteur vide si le dossier n'existe pas
+        Err(_) => return jmx_files, // Returns an empty vector if the directory doesn't exist
     };
 
     for entry in entries {
@@ -101,5 +101,172 @@ pub fn init_app_config_dir(path: &Path, error: &str) {
     match fs::create_dir_all(&path) {
         Ok(_) => (),
         Err(e) => panic!("{error} {}: {}", path.to_str().unwrap(), e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_validate_and_normalize_path_valid_absolute() {
+        let result = validate_and_normalize_path("/home/user/project");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/home/user/project");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_removes_trailing_slash() {
+        let result = validate_and_normalize_path("/home/user/project/");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/home/user/project");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_keeps_root() {
+        let result = validate_and_normalize_path("/");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "/");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_rejects_relative() {
+        let result = validate_and_normalize_path("home/user/project");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Path must be absolute (start with '/')");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_rejects_dot() {
+        let result = validate_and_normalize_path("/home/./project");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_rejects_dotdot() {
+        let result = validate_and_normalize_path("/home/../project");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_rejects_tilde() {
+        let result = validate_and_normalize_path("/~/project");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+    }
+
+    #[test]
+    fn test_validate_and_normalize_path_rejects_whitespace() {
+        let result = validate_and_normalize_path("/home/user name/project");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Path contains whitespace in segments");
+    }
+
+    #[test]
+    fn test_clear_file_extension_single_extension() {
+        assert_eq!(clear_file_extension("test.jmx"), "test");
+    }
+
+    #[test]
+    fn test_clear_file_extension_multiple_extensions() {
+        assert_eq!(clear_file_extension("test.tar.gz"), "test");
+    }
+
+    #[test]
+    fn test_clear_file_extension_no_extension() {
+        assert_eq!(clear_file_extension("test"), "test");
+    }
+
+    #[test]
+    fn test_clear_file_extension_hidden_file_no_extension() {
+        // Hidden files without extensions keep their name
+        assert_eq!(clear_file_extension(".gitignore"), ".gitignore");
+    }
+
+    #[test]
+    fn test_clear_file_extension_hidden_file_with_extension() {
+        // Hidden files with extensions have them removed
+        assert_eq!(clear_file_extension(".bashrc.backup"), ".bashrc");
+    }
+
+    #[test]
+    fn test_get_path_if_exists_valid() {
+        let tmp = tempdir().unwrap();
+        let tmp_path = tmp.path().to_str().unwrap();
+        let result = get_path_if_exists(tmp_path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_str().unwrap(), tmp_path);
+    }
+
+    #[test]
+    fn test_get_path_if_exists_nonexistent() {
+        let result = get_path_if_exists("/this/path/does/not/exist");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("does not exist"));
+    }
+
+    #[test]
+    fn test_list_plan_files_empty_directory() {
+        let tmp = tempdir().unwrap();
+        let files = list_plan_files(tmp.path().to_str().unwrap());
+        assert_eq!(files.len(), 0);
+    }
+
+    #[test]
+    fn test_list_plan_files_with_jmx_files() {
+        let tmp = tempdir().unwrap();
+        
+        // Create some test files
+        fs::write(tmp.path().join("test1.jmx"), "content").unwrap();
+        fs::write(tmp.path().join("test2.jmx"), "content").unwrap();
+        fs::write(tmp.path().join("readme.txt"), "content").unwrap();
+        
+        let files = list_plan_files(tmp.path().to_str().unwrap());
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&"test1.jmx".to_string()));
+        assert!(files.contains(&"test2.jmx".to_string()));
+        assert!(!files.contains(&"readme.txt".to_string()));
+    }
+
+    #[test]
+    fn test_list_plan_files_nonexistent_directory() {
+        let files = list_plan_files("/this/path/does/not/exist");
+        assert_eq!(files.len(), 0);
+    }
+
+    #[test]
+    fn test_init_file_creates_file() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("test.txt");
+        
+        assert!(!file_path.exists());
+        init_file(&file_path).unwrap();
+        assert!(file_path.exists());
+    }
+
+    #[test]
+    fn test_init_file_existing_file() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("test.txt");
+        
+        fs::write(&file_path, "existing content").unwrap();
+        assert!(file_path.exists());
+        
+        init_file(&file_path).unwrap();
+        assert!(file_path.exists());
+        
+        // Should not overwrite existing file
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "existing content");
+    }
+
+    #[test]
+    fn test_get_tmp_dir_returns_path() {
+        let tmp_dir = get_tmp_dir();
+        assert!(tmp_dir.is_absolute());
     }
 }

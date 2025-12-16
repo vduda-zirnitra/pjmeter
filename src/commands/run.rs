@@ -72,3 +72,118 @@ fn get_plans_to_run(plans: &Vec<String>, project_path: &str) -> Vec<String> {
         validated_plans
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_get_plans_to_run_empty_returns_all() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        // Create test plan files
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan2.jmx"), "content").unwrap();
+
+        let plans = vec![];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&"plan1.jmx".to_string()));
+        assert!(result.contains(&"plan2.jmx".to_string()));
+    }
+
+    #[test]
+    fn test_get_plans_to_run_all_keyword_returns_all() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan2.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan3.jmx"), "content").unwrap();
+
+        let plans = vec!["all".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_get_plans_to_run_specific_valid_plan() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan2.jmx"), "content").unwrap();
+
+        let plans = vec!["plan1.jmx".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "plan1.jmx");
+    }
+
+    #[test]
+    fn test_get_plans_to_run_multiple_valid_plans() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan2.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan3.jmx"), "content").unwrap();
+
+        let plans = vec!["plan1.jmx".to_string(), "plan3.jmx".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "plan1.jmx");
+        assert_eq!(result[1], "plan3.jmx");
+    }
+
+    #[test]
+    fn test_get_plans_to_run_invalid_plan_filtered_out() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+        fs::write(plans_dir.join("plan2.jmx"), "content").unwrap();
+
+        let plans = vec!["plan1.jmx".to_string(), "nonexistent.jmx".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "plan1.jmx");
+    }
+
+    #[test]
+    fn test_get_plans_to_run_all_invalid_returns_empty() {
+        let tmp = tempdir().unwrap();
+        let plans_dir = tmp.path().join("jmeter/plans");
+        fs::create_dir_all(&plans_dir).unwrap();
+        
+        fs::write(plans_dir.join("plan1.jmx"), "content").unwrap();
+
+        let plans = vec!["nonexistent1.jmx".to_string(), "nonexistent2.jmx".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_get_plans_to_run_no_plans_directory() {
+        let tmp = tempdir().unwrap();
+
+        let plans = vec!["plan1.jmx".to_string()];
+        let result = get_plans_to_run(&plans, tmp.path().to_str().unwrap());
+
+        assert_eq!(result.len(), 0);
+    }
+}
