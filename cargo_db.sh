@@ -15,11 +15,14 @@ print_usage() {
 Usage:
   ./cargo_db.sh build [cargo build options...]
   ./cargo_db.sh run   [cargo run options...]
+  ./cargo_db.sh test  [cargo test options...]
 
 Examples:
   ./cargo_db.sh build --release
   ./cargo_db.sh run -- --flag value
   ./cargo_db.sh run --release -- --flag value
+  ./cargo_db.sh test
+  ./cargo_db.sh test --release
 
 Notes:
 - Rebuilds a fresh temp DB at target/sqlx/build-check.db every time.
@@ -133,9 +136,9 @@ main() {
 
   local cmd="$1"; shift || true
   case "$cmd" in
-    build|run) ;;
+    build|run|test) ;;
     -h|--help) print_usage; exit 0 ;;
-    *) echo "Error: unknown command '$cmd' (expected 'build' or 'run')" >&2; print_usage; exit 1 ;;
+    *) echo "Error: unknown command '$cmd' (expected 'build', 'run', or 'test')" >&2; print_usage; exit 1 ;;
   esac
 
   ensure_sqlx_cli
