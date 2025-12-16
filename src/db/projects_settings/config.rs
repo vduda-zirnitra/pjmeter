@@ -65,9 +65,12 @@ fn get_home_dir() -> PathBuf {
 
 async fn update_database(database_url: &str) -> Result<()> {
     let mut conn = SqliteConnection::connect(database_url).await?;
-    if let Err(error) = migrate!("./migrations/projects_settings").run(&mut conn).await {
-        eprintln!("Database update failed: {}", error);
-        return Err(anyhow::anyhow!("Database update failed: {}", error));
-    }
+    migrate!("./migrations/projects_settings")
+        .run(&mut conn)
+        .await
+        .map_err(|e| {
+            eprintln!("Database update failed: {}", e);
+            anyhow::anyhow!("Database update failed: {}", e)
+        })?;
     Ok(())
 }

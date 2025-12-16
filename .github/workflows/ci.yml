@@ -47,14 +47,14 @@ jobs:
         mkdir -p target/sqlx
         
         # Test pjmeter_settings migrations
-        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_pjmeter.db"
-        sqlx database create
-        sqlx migrate run --source migrations/pjmeter_settings
+        DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_pjmeter.db"
+        sqlx database create --database-url "$DATABASE_URL"
+        sqlx migrate run --source migrations/pjmeter_settings --database-url "$DATABASE_URL"
         
         # Test projects_settings migrations
-        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_projects.db"
-        sqlx database create
-        sqlx migrate run --source migrations/projects_settings
+        DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_projects.db"
+        sqlx database create --database-url "$DATABASE_URL"
+        sqlx migrate run --source migrations/projects_settings --database-url "$DATABASE_URL"
 
     - name: Build project
       run: ./cargo_db.sh build
