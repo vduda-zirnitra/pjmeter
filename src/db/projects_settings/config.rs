@@ -67,7 +67,7 @@ async fn update_database(database_url: &str) -> Result<()> {
     let mut conn = SqliteConnection::connect(database_url).await?;
     if let Err(error) = migrate!("./migrations/projects_settings").run(&mut conn).await {
         eprintln!("Database update failed: {}", error);
-        return Err(anyhow::anyhow!("Database update failed"));
+        return Err(anyhow::anyhow!("Database update failed: {}", error));
     }
     Ok(())
 }
