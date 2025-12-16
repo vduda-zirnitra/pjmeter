@@ -55,7 +55,7 @@ pub fn list_plan_files(project_dir_path: &str) -> Vec<String> {
     let mut jmx_files = Vec::new();
     let entries = match fs::read_dir(project_dir_path) {
         Ok(entries) => entries,
-        Err(_) => return jmx_files, // Retourne un vecteur vide si le dossier n'existe pas
+        Err(_) => return jmx_files, // Returns an empty vector if the directory doesn't exist
     };
 
     for entry in entries {
@@ -182,9 +182,15 @@ mod tests {
     }
 
     #[test]
-    fn test_clear_file_extension_hidden_file() {
+    fn test_clear_file_extension_hidden_file_no_extension() {
         // Hidden files without extensions keep their name
         assert_eq!(clear_file_extension(".gitignore"), ".gitignore");
+    }
+
+    #[test]
+    fn test_clear_file_extension_hidden_file_with_extension() {
+        // Hidden files with extensions have them removed
+        assert_eq!(clear_file_extension(".bashrc.backup"), ".bashrc");
     }
 
     #[test]
