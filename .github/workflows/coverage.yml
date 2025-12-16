@@ -28,18 +28,46 @@ jobs:
         toolchain: stable
         components: llvm-tools-preview
 
+    - name: Cache cargo tools
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/sqlx
+          ~/.cargo/bin/cargo-llvm-cov
+        key: ${{ runner.os }}-cargo-coverage-tools-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-coverage-tools-
+
     - name: Install sqlx-cli
-      run: cargo install sqlx-cli --no-default-features --features sqlite
+      run: |
+        if ! command -v sqlx &> /dev/null; then
+          cargo install sqlx-cli --no-default-features --features sqlite
+        fi
 
     - name: Install cargo-llvm-cov
-      run: cargo install cargo-llvm-cov
+      run: |
+        if ! command -v cargo-llvm-cov &> /dev/null; then
+          cargo install cargo-llvm-cov
+        fi
+
+    - name: Setup test database
+      run: ./cargo_db.sh build
 
     - name: Generate code coverage
       run: |
-        source <(cargo llvm-cov show-env --export-prefix)
-        cargo llvm-cov clean --workspace
-        ./cargo_db.sh test
-        cargo llvm-cov report --lcov --output-path lcov.info
+        # Prepare migrations and database URL (matching cargo_db.sh logic)
+        TARGET_DIR="${CARGO_TARGET_DIR:-./target}"
+        SQLX_DIR="$TARGET_DIR/sqlx"
+        COMBINED_DIR="$SQLX_DIR/combined_migrations"
+        DB_PATH="$SQLX_DIR/build-check.db"
+        
+        # The database should already exist from the build step
+        # Get absolute path for DATABASE_URL
+        DB_ABS_PATH="$(cd "$(dirname "$DB_PATH")" && pwd)/$(basename "$DB_PATH")"
+        export DATABASE_URL="sqlite:///${DB_ABS_PATH#/}"
+        
+        # Run tests with coverage
+        cargo llvm-cov --lcov --output-path lcov.info
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

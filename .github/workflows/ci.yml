@@ -27,8 +27,19 @@ jobs:
       with:
         toolchain: stable
 
+    - name: Cache cargo tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/sqlx
+        key: ${{ runner.os }}-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-sqlx-
+
     - name: Install sqlx-cli
-      run: cargo install sqlx-cli --no-default-features --features sqlite
+      run: |
+        if ! command -v sqlx &> /dev/null; then
+          cargo install sqlx-cli --no-default-features --features sqlite
+        fi
 
     - name: Build project
       run: ./cargo_db.sh build
