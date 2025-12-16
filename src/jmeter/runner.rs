@@ -361,6 +361,8 @@ mod tests {
 
     #[test]
     fn test_post_kill_large_file() {
+        use std::io::{BufRead, BufReader};
+        
         let tmp = tempdir().unwrap();
         let file_path = tmp.path().join("large.jtl");
         
@@ -371,16 +373,27 @@ mod tests {
         }
         drop(file);
 
-        let original_content = fs::read_to_string(&file_path).unwrap();
-        let line_count_before = original_content.lines().count();
+        // Count lines before without reading entire file into memory
+        let file_before = fs::File::open(&file_path).unwrap();
+        let line_count_before = BufReader::new(file_before).lines().count();
 
         post_kill(&file_path).unwrap();
 
-        let new_content = fs::read_to_string(&file_path).unwrap();
-        let line_count_after = new_content.lines().count();
+        // Count lines after
+        let file_after = fs::File::open(&file_path).unwrap();
+        let line_count_after = BufReader::new(file_after).lines().count();
 
         assert_eq!(line_count_after, line_count_before - 1);
-        assert!(new_content.ends_with('\n'));
+        
+        // Check file ends with newline
+        let metadata = fs::metadata(&file_path).unwrap();
+        if metadata.len() > 0 {
+            let mut file = fs::File::open(&file_path).unwrap();
+            let mut last_byte = [0u8; 1];
+            file.seek(SeekFrom::End(-1)).unwrap();
+            file.read_exact(&mut last_byte).unwrap();
+            assert_eq!(last_byte[0], b'\n');
+        }
     }
 
     #[test]
