@@ -290,3 +290,108 @@ fn monitor_jtl_inactivity(
         thread::sleep(poll_interval);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_post_kill_empty_file() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("empty.jtl");
+        fs::write(&file_path, "").unwrap();
+
+        let result = post_kill(&file_path);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_post_kill_single_line_with_newline() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("single.jtl");
+        fs::write(&file_path, "line1\n").unwrap();
+
+        post_kill(&file_path).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_post_kill_single_line_without_newline() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("single.jtl");
+        fs::write(&file_path, "line1").unwrap();
+
+        post_kill(&file_path).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_post_kill_multiple_lines_with_newline() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("multi.jtl");
+        fs::write(&file_path, "line1\nline2\nline3\n").unwrap();
+
+        post_kill(&file_path).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "line1\nline2\n");
+    }
+
+    #[test]
+    fn test_post_kill_multiple_lines_without_newline() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("multi.jtl");
+        fs::write(&file_path, "line1\nline2\nline3").unwrap();
+
+        post_kill(&file_path).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "line1\nline2\n");
+    }
+
+    #[test]
+    fn test_post_kill_large_file() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("large.jtl");
+        
+        // Create a file larger than CHUNK size (128KB)
+        let mut file = fs::File::create(&file_path).unwrap();
+        for i in 0..10000 {
+            writeln!(file, "This is line number {}", i).unwrap();
+        }
+        drop(file);
+
+        let original_content = fs::read_to_string(&file_path).unwrap();
+        let line_count_before = original_content.lines().count();
+
+        post_kill(&file_path).unwrap();
+
+        let new_content = fs::read_to_string(&file_path).unwrap();
+        let line_count_after = new_content.lines().count();
+
+        assert_eq!(line_count_after, line_count_before - 1);
+        assert!(new_content.ends_with('\n'));
+    }
+
+    #[test]
+    fn test_post_kill_two_lines() {
+        let tmp = tempdir().unwrap();
+        let file_path = tmp.path().join("two.jtl");
+        fs::write(&file_path, "first\nsecond\n").unwrap();
+
+        post_kill(&file_path).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "first\n");
+    }
+}
