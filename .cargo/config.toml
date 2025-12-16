@@ -1,0 +1,3 @@
+[env]
+# Absolute path; sqlite requires exactly three slashes for absolute paths.
+DATABASE_URL = "sqlite://target/sqlx/build-check.db"
