@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+case "${1:-}" in
+  remove|purge)
+    [ -L /usr/bin/pjmeter ] && rm -f /usr/bin/pjmeter
+    [ -d /var/opt/pjmeter ] && rm -rf -- /var/opt/pjmeter
+    [ -d /opt/pjmeter ] && rm -rf -- /opt/pjmeter
+    ;;
+esac
+
+exit 0

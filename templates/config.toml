@@ -1,0 +1,31 @@
+[jmeter]
+# When running PJMeter in design mode, you can choose to automatically open a default test plan.
+# This parameter is optional : comment it not to use it.
+default_test_plan = "a_sample_plan.jmx"
+
+# JMeter sometimes fail to realize that all its threads are finished.
+# If the .jml file doesn't change for the amount of time given (in seconds), then
+# pjmeter kills JMeter, deletes the last line from the .jml file and generates the report.
+# This parameter is optional : comment if not to use it. If not used, JMeter might hang indefinitely waiting for its threads to finish.
+inactivity_kill_timeout = 60 # in seconds
+
+[plugins]
+# Add the plugins your project will use in the following section.
+#jpgc-casutg = "3.1.1"
+#jpgc-dummy = "0.4"
+#jpgc-functions = "2.2"
+#jpgc-graphs-basic = "2.0"
+#jpgc-graphs-composite = "2.0"
+
+# This environment is used for a_sample_plan.jmx, delete it and use your own env. configuration.
+[env.typicode]
+PROTOCOL = "https"
+TARGET_ENV_URL = "jsonplaceholder.typicode.com"
+TARGET_ENV_PORT = "443"
+
+# Add your environments below, as child tables of [env]
+# each entry will be an environment variable available in your .jmx files.
+#[env.local]
+#PROTOCOL = "https"
+#TARGET_ENV_URL = "localhost"
+#TARGET_ENV_PORT = "8080"

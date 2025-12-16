@@ -1,0 +1,16 @@
+# This .gitignore file works in whitelisting mode.
+# First, ignore everything
+*
+
+# Then, only the following is allowed.
+!README.md
+!config.toml
+
+!/plans/
+!/plans/.gitkeep
+!/plans/*.jmx
+
+!/results/
+!/results/.gitkeep
+!/results/*/
+!/results/*/**

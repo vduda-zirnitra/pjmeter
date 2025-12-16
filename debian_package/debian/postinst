@@ -1,0 +1,97 @@
+#!/bin/sh
+# postinst for pjmeter
+set -e
+
+GROUPNAME="pjmeter"
+BIN="/opt/pjmeter/bin/pjmeter"
+LINK="/usr/bin/pjmeter"
+
+
+case "$1" in
+  configure)
+    # 1) Ensure group exists
+    if ! getent group "$GROUPNAME" >/dev/null 2>&1; then
+      if command -v addgroup >/dev/null 2>&1; then
+        addgroup --quiet "$GROUPNAME" || true
+      else
+        groupadd "$GROUPNAME" || true
+      fi
+    fi
+
+    # 2) Add the installing user to the group (best-effort)
+    INSTALL_USER=""
+    if [ -n "${SUDO_USER-}" ] && [ "$SUDO_USER" != "root" ]; then
+      INSTALL_USER="$SUDO_USER"
+    else
+      # Fallback to login name if available
+      LU="$(logname 2>/dev/null || true)"
+      if [ -n "$LU" ] && [ "$LU" != "root" ]; then
+        INSTALL_USER="$LU"
+      fi
+    fi
+
+    if [ -n "$INSTALL_USER" ] && id "$INSTALL_USER" >/dev/null 2>&1; then
+      if command -v adduser >/dev/null 2>&1; then
+        adduser "$INSTALL_USER" "$GROUPNAME" || true
+      else
+        usermod -a -G "$GROUPNAME" "$INSTALL_USER" || true
+      fi
+      echo "User $INSTALL_USER added to group $GROUPNAME"
+    else
+      echo "Could not detect a non-root installing user; skipping group membership change."
+    fi
+
+    # 3) Ensure directories
+    if [ ! -d /opt/pjmeter ]; then
+        echo "pjmeter postinst: critical: /opt/pjmeter is missing. Reinstall the package to restore payload." >&2
+        exit 1
+    fi
+    if [ ! -d /opt/pjmeter/jmeter_plugins ]; then
+      install -d -o root -g "$GROUPNAME" -m 2770 /opt/pjmeter/jmeter_plugins
+    fi
+
+    # Make everything under /opt/pjmeter belong to root:pjmeter
+    chown -R root:"$GROUPNAME" /opt/pjmeter || true
+
+    # Give group read/write where appropriate; keep others as-is (except jmeter_plugins below)
+    chmod -R g+rwX /opt/pjmeter || true
+
+    # Ensure new items inherit group pjmeter
+    chmod g+s /opt/pjmeter || true
+
+    # Make /var/opt/pjmeter belong to root:pjmeter
+    chown -R root:"$GROUPNAME" /var/opt/pjmeter || true
+
+    # Ensure new items inherit group pjmeter
+    chmod g+s /var/opt/pjmeter || true
+    if command -v setfacl >/dev/null 2>&1; then
+      setfacl -d -m u::rwX,g::rwX,o::--- /var/opt/pjmeter || true
+    fi
+
+    # 4) Binary permissions:
+    #    - owner (root): rwx
+    #    - group (pjmeter): r-x
+    #    - others: ---
+    if [ -f "$BIN" ]; then
+      chmod 0750 "$BIN" || true
+    fi
+
+    # 5) Tighten jmeter_plugins:
+    #    - group ownership pjmeter
+    #    - directory perms 2770 (rwx for owner/group, none for others)
+    #    - set default ACLs so new files are 660 and dirs 770 with group pjmeter
+    chmod 2770 /opt/pjmeter/jmeter_plugins || true
+
+    if command -v setfacl >/dev/null 2>&1; then
+      # Effective perms
+      setfacl -m g::rwx,o::--- /opt/pjmeter/jmeter_plugins || true
+      # Default perms for newly created items inside the directory
+      setfacl -d -m u::rwX,g::rwX,o::--- /opt/pjmeter/jmeter_plugins || true
+    fi
+
+    # 6) Symlink on PATH (Debian packages should use /usr/bin, not /usr/local)
+    ln -sf "$BIN" "$LINK"
+  ;;
+esac
+
+exit 0
