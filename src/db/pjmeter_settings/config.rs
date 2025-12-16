@@ -14,7 +14,7 @@ pub async fn init_db_pool() -> Result<()> {
     let database_url = format!("sqlite://{}", conf_path.to_str().unwrap());
 
     // Run your database updates first
-    update_database(&database_url).await;
+    update_database(&database_url).await?;
 
     // Create the pool
     let pool = SqlitePoolOptions::new()
@@ -53,11 +53,11 @@ fn get_conf_path() -> PathBuf {
     conf_path
 }
 
-async fn update_database(database_url: &str) {
-    let mut conn = SqliteConnection::connect(database_url).await.unwrap();
-
-    match migrate!("./migrations/pjmeter_settings").run(&mut conn).await {
-        Ok(_) => (),
-        Err(e) => panic!("Database update failed: {}", e),
-    };
+async fn update_database(database_url: &str) -> Result<()> {
+    let mut conn = SqliteConnection::connect(database_url).await?;
+    if let Err(error) = migrate!("./migrations/pjmeter_settings").run(&mut conn).await {
+        eprintln!("Database update failed: {}", error);
+        return Err(anyhow::anyhow!("Database update failed"));
+    }
+    Ok(())
 }

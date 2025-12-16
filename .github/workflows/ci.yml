@@ -41,6 +41,21 @@ jobs:
           cargo install sqlx-cli --no-default-features --features sqlite
         fi
 
+    - name: Test database migrations
+      run: |
+        # Create test databases and run migrations
+        mkdir -p target/sqlx
+        
+        # Test pjmeter_settings migrations
+        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_pjmeter.db"
+        sqlx database create
+        sqlx migrate run --source migrations/pjmeter_settings
+        
+        # Test projects_settings migrations
+        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_projects.db"
+        sqlx database create
+        sqlx migrate run --source migrations/projects_settings
+
     - name: Build project
       run: ./cargo_db.sh build
 
