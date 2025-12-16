@@ -61,3 +61,90 @@ fn write_file_to_dir(destination_dir: &Path, template: FileTemplates) -> Result<
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_init_jmeter_dir_creates_structure() {
+        let tmp = tempdir().unwrap();
+        let result = init_jmeter_dir(tmp.path());
+        assert!(result.is_ok());
+
+        // Check directories exist
+        assert!(tmp.path().join("jmeter").exists());
+        assert!(tmp.path().join("jmeter/plans").exists());
+        assert!(tmp.path().join("jmeter/results").exists());
+
+        // Check files exist
+        assert!(tmp.path().join("jmeter/README.md").exists());
+        assert!(tmp.path().join("jmeter/config.toml").exists());
+        assert!(tmp.path().join("jmeter/.gitignore").exists());
+        assert!(tmp.path().join("jmeter/plans/.gitkeep").exists());
+        assert!(tmp.path().join("jmeter/plans/a_sample_plan.jmx").exists());
+        assert!(tmp.path().join("jmeter/results/.gitkeep").exists());
+    }
+
+    #[test]
+    fn test_init_jmeter_dir_idempotent() {
+        let tmp = tempdir().unwrap();
+        
+        // First call
+        let result1 = init_jmeter_dir(tmp.path());
+        assert!(result1.is_ok());
+
+        // Second call should not fail
+        let result2 = init_jmeter_dir(tmp.path());
+        assert!(result2.is_ok());
+
+        // Structure should still be valid
+        assert!(tmp.path().join("jmeter").exists());
+        assert!(tmp.path().join("jmeter/plans").exists());
+        assert!(tmp.path().join("jmeter/results").exists());
+    }
+
+    #[test]
+    fn test_init_jmeter_dir_files_have_content() {
+        let tmp = tempdir().unwrap();
+        init_jmeter_dir(tmp.path()).unwrap();
+
+        // Check that files are not empty
+        let readme_content = fs::read_to_string(tmp.path().join("jmeter/README.md")).unwrap();
+        assert!(!readme_content.is_empty());
+
+        let config_content = fs::read_to_string(tmp.path().join("jmeter/config.toml")).unwrap();
+        assert!(!config_content.is_empty());
+        assert!(config_content.contains("[jmeter]"));
+        assert!(config_content.contains("[plugins]"));
+        assert!(config_content.contains("[env."));
+
+        let plan_content = fs::read_to_string(tmp.path().join("jmeter/plans/a_sample_plan.jmx")).unwrap();
+        assert!(!plan_content.is_empty());
+    }
+
+    #[test]
+    fn test_create_sub_dir() {
+        let tmp = tempdir().unwrap();
+        let result = create_sub_dir(tmp.path(), "test_dir");
+        assert!(result.is_ok());
+        
+        let created_path = result.unwrap();
+        assert!(created_path.exists());
+        assert!(created_path.is_dir());
+        assert_eq!(created_path.file_name().unwrap(), "test_dir");
+    }
+
+    #[test]
+    fn test_create_sub_dir_already_exists() {
+        let tmp = tempdir().unwrap();
+        let test_dir = tmp.path().join("test_dir");
+        fs::create_dir(&test_dir).unwrap();
+
+        let result = create_sub_dir(tmp.path(), "test_dir");
+        assert!(result.is_ok());
+        assert!(test_dir.exists());
+    }
+}
