@@ -66,7 +66,7 @@ pub fn run_with_jmeter(
         let mut execution_status = ExecutionStatus::OK;
 
         {
-            // 1 : éxécution du test
+            // 1 : Test plan execution
             pb.set_prefix(format!("{}", style("SETTING UP").cyan().bold()));
             let mut cmd = init_jmeter_command(project_config, environment, project_dir);
             let jtl_path = format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl");
@@ -143,7 +143,7 @@ pub fn run_with_jmeter(
             }
         }
 
-        // 2 : génération du rapport
+        // 2 : Generate report
         if execution_status != ExecutionStatus::Failed {
             pb.set_prefix(format!("{}", style("GENERATING REPORT").cyan().bold()));
             let mut cmd = init_jmeter_command(project_config, environment, project_dir);
@@ -162,7 +162,7 @@ pub fn run_with_jmeter(
         }
 
         {
-            // 3 : suppression des fichiers temporaires
+            // 3 : Delete temporary files
             pb.set_prefix(format!("{}", style("CLEANING").cyan().bold()));
             fs::remove_file(Path::new(
                 format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl").as_str(),
@@ -190,7 +190,7 @@ pub fn run_with_jmeter(
             ExecutionStatus::Failed => {
                 pb.set_prefix(format!("{}", style("FAILED").red().bold()));
                 eprintln!(
-                    "Check log file a{project_dir}/jmeter/results/{plan_name}_{execution_time}.log"
+                    "Check log file {project_dir}/jmeter/results/{plan_name}_{execution_time}.log"
                 );
             }
         }
