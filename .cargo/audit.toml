@@ -1,0 +1,20 @@
+# Configuration for cargo-audit
+#
+# This file documents security advisories that have been reviewed and
+# deemed not applicable to this project.
+
+[advisories]
+# RUSTSEC-2023-0071: Marvin Attack in RSA crate
+# 
+# This vulnerability affects the `rsa` crate used by `sqlx-mysql`.
+# However, this project ONLY uses the SQLite backend of sqlx, not MySQL.
+# The RSA code path is never executed in this application.
+#
+# The vulnerability requires attackers to observe timing information over
+# a network connection, which is not applicable to our SQLite-only usage.
+#
+# We will remove this ignore once sqlx updates to a fixed version of rsa
+# or when we can exclude the mysql feature dependency.
+ignore = [
+    "RUSTSEC-2023-0071"
+]
