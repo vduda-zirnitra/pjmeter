@@ -6,7 +6,6 @@ use crate::project_config::ProjectConfig;
 use crate::prompts;
 use anyhow::Result;
 use std::path::Path;
-use std::process::exit;
 
 pub async fn exec(
     project: &Option<String>,
@@ -29,45 +28,37 @@ pub async fn exec(
     };
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(pool, &project).await? {
-        None => {
-            eprintln!("Project {project} not found.");
-            eprintln!(
-                "Please check projects with 'pjmeter project list' or add the project with 'pjmeter project add --label my-project --path /absolute/path/to/my/project/"
-            );
-            exit(1)
-        }
-        Some(some_project) => {
-            let p_config = ProjectConfig::open(Path::new(&some_project.absolute_path))
-                .unwrap_or_else(|e| {
-                    eprintln!("{e}");
-                    exit(1)
-                });
+    let some_project = projects_settings::settings::get_project(pool, &project)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!(
+            "Project {} not found.\nPlease check projects with 'pjmeter project list' or add the project with 'pjmeter project add --label my-project --path /absolute/path/to/my/project/'",
+            project
+        ))?;
 
-            if !p_config.env.custom_environments.contains_key(&environment) {
-                eprintln!("Environment {environment} not found for project {project}");
-                eprintln!(
-                    "Check the environment in {}/jmeter/config.toml",
-                    some_project.absolute_path
-                );
-                exit(1)
-            }
+    let p_config = ProjectConfig::open(Path::new(&some_project.absolute_path))
+        .map_err(|e| anyhow::anyhow!("Failed to open project config: {}", e))?;
 
-            load_plugins(&p_config.plugins).await?;
-
-            println!("Running plans for project {project} and environment {environment}");
-            let plans_to_run = get_plans_to_run(&plans, &some_project.absolute_path);
-            runner::run_with_jmeter(
-                &p_config,
-                &environment,
-                plans_to_run,
-                &some_project.absolute_path,
-            )
-            .unwrap_or_else(|e| eprintln!("Failed to run jmeter: {e}"));
-
-            let _ = remove_all_plugin_jars_symlinks();
-        }
+    if !p_config.env.custom_environments.contains_key(&environment) {
+        return Err(anyhow::anyhow!(
+            "Environment {} not found for project {}\nCheck the environment in {}/jmeter/config.toml",
+            environment,
+            project,
+            some_project.absolute_path
+        ));
     }
+
+    load_plugins(&p_config.plugins).await?;
+
+    println!("Running plans for project {project} and environment {environment}");
+    let plans_to_run = get_plans_to_run(&plans, &some_project.absolute_path);
+    runner::run_with_jmeter(
+        &p_config,
+        &environment,
+        plans_to_run,
+        &some_project.absolute_path,
+    )?;
+
+    let _ = remove_all_plugin_jars_symlinks();
 
     Ok(())
 }

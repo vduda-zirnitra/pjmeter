@@ -2,12 +2,11 @@ use crate::db::projects_settings;
 use crate::io;
 use crate::prompts;
 use anyhow::Result;
-use std::process::exit;
 
 pub async fn exec(label: Option<&String>, path: Option<&String>) -> Result<()> {
     let label = match label {
         Some(project) => project.clone(),
-        None => prompts::get_project_label_from_prompt().await,
+        None => prompts::get_project_label_from_prompt().await?,
     };
     let path = match path {
         Some(path) => path.clone(),
@@ -21,21 +20,14 @@ pub async fn exec(label: Option<&String>, path: Option<&String>) -> Result<()> {
             some_project.absolute_path
         ),
         None => {
-            let normalised_path =
-                io::path::validate_and_normalize_path(&path).unwrap_or_else(|e| {
-                    eprintln!("{}", e);
-                    exit(1)
-                });
+            let normalised_path = io::path::validate_and_normalize_path(&path)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-            let target_path = io::path::get_path_if_exists(&normalised_path).unwrap_or_else(|e| {
-                eprintln!("{}", e);
-                exit(1)
-            });
+            let target_path = io::path::get_path_if_exists(&normalised_path)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-            if let Err(e) = io::project_struct::init_jmeter_dir(&target_path) {
-                eprintln!("Error: {:?}", e);
-                exit(1);
-            }
+            io::project_struct::init_jmeter_dir(&target_path)
+                .map_err(|e| anyhow::anyhow!("Error initializing jmeter directory: {:?}", e))?;
 
             projects_settings::settings::add_project(pool, &label, &normalised_path).await?;
             println!("Added project '{label}' with path : '{normalised_path}'");
