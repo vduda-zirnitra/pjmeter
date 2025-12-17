@@ -26,10 +26,10 @@ use uzers::get_group_by_name;
 const JMETER_PLUGIN_PACKAGES: &str = "https://jmeter-plugins.org/files/packages/";
 
 fn get_local_plugins_path() -> PathBuf {
-    let mut path = PathBuf::new();
-
     #[cfg(not(debug_assertions))]
     {
+        let mut path = PathBuf::new();
+        
         #[cfg(target_os = "windows")]
         {
             if let Ok(program_data) = std::env::var("PROGRAMDATA") {
@@ -37,36 +37,38 @@ fn get_local_plugins_path() -> PathBuf {
             } else {
                 path.push("C:\\ProgramData");
             }
-            path.push("pjmeter");
-            path.push("jmeter_plugins");
         }
-
+        
         #[cfg(target_os = "macos")]
         {
-            path.push("/Library/Application Support/pjmeter/jmeter_plugins");
+            path.push("/Library/Application Support");
         }
-
+        
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
-            path.push("/opt/pjmeter/jmeter_plugins");
+            path.push("/opt");
         }
+        
+        path.push("pjmeter");
+        path.push("jmeter_plugins");
+        path
     }
-
+    
     #[cfg(debug_assertions)]
     {
-        path.push(env!("CARGO_MANIFEST_DIR"));
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push(".sandbox");
         path.push("jmeter_plugins");
+        path
     }
-
-    path
 }
 
 fn get_jmeter_plugin_path() -> PathBuf {
-    let mut path = PathBuf::new();
-
     #[cfg(not(debug_assertions))]
     {
+        let mut path = PathBuf::new();
+        
+        // Platform-specific program files directory
         #[cfg(target_os = "windows")]
         {
             if let Ok(program_files) = std::env::var("PROGRAMFILES") {
@@ -74,33 +76,34 @@ fn get_jmeter_plugin_path() -> PathBuf {
             } else {
                 path.push("C:\\Program Files");
             }
-            path.push("pjmeter");
-            path.push("jmeter");
-            path.push("lib");
-            path.push("ext");
         }
-
+        
         #[cfg(target_os = "macos")]
         {
-            path.push("/Applications/pjmeter/jmeter/lib/ext");
+            path.push("/Applications");
         }
-
+        
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
-            path.push("/opt/pjmeter/jmeter/lib/ext");
+            path.push("/opt");
         }
+        
+        path.push("pjmeter");
+        path.push("jmeter");
+        path.push("lib");
+        path.push("ext");
+        path
     }
-
+    
     #[cfg(debug_assertions)]
     {
-        path.push(env!("CARGO_MANIFEST_DIR"));
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push(".sandbox");
         path.push("jmeter");
         path.push("lib");
         path.push("ext");
+        path
     }
-
-    path
 }
 
 #[derive(Debug, Deserialize)]
@@ -570,11 +573,9 @@ async fn download_and_register_plugin(
         }
     }
 
+    // On non-Unix systems, skip the group change step  
     #[cfg(not(unix))]
-    {
-        // On non-Unix systems, skip the group change step
-        let _ = group_name; // Suppress unused variable warning
-    }
+    let _ = (group_name, &spinner); // Suppress unused warnings
 
     // Registering in DB
     spinner.set_prefix(format!("{}", style("REGISTERING").cyan().bold()));
