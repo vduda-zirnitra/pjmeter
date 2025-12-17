@@ -6,7 +6,7 @@ use crate::db::projects_settings;
 use crate::jmeter::plugins::{load_plugins, remove_all_plugin_jars_symlinks};
 use crate::jmeter::runner;
 use crate::project_config::ProjectConfig;
-use crate::prompts::prompts;
+use crate::prompts;
 
 pub async fn exec(project: &Option<String>, environment: &Option<String>) -> Result<()> {
     let project = match project {
@@ -21,7 +21,7 @@ pub async fn exec(project: &Option<String>, environment: &Option<String>) -> Res
     println!("Designing for project {project} and environment {environment}");
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(&pool, &project).await? {
+    match projects_settings::settings::get_project(pool, &project).await? {
         None => {
             eprintln!("Project {project} not found.");
             eprintln!(

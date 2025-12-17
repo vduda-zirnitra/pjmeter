@@ -105,7 +105,7 @@ To avoid reopening a session while just being added to the group, use "newgrp pj
     match &cli.command {
         None => {
             let actions = &["Design", "Run", "Project", "Health Check"];
-            match prompts::prompts::prompt_display_main_menu(actions).await? {
+            match prompts::prompt_display_main_menu(actions).await? {
                 0 => commands::design::exec(&None, &None).await?,
                 1 => commands::run::exec(&None, &None, &None).await?,
                 2 => handle_project_option().await?,
@@ -155,7 +155,7 @@ To avoid reopening a session while just being added to the group, use "newgrp pj
 async fn handle_project_option() -> Result<()> {
     let project_commands = &["Add", "Update", "List", "Remove"];
 
-    match prompts::prompts::prompt_project_menu(project_commands).await? {
+    match prompts::prompt_project_menu(project_commands).await? {
         0 => commands::project::add::exec(None, None).await?,
         1 => commands::project::update::exec(None, &None, &None).await?,
         2 => commands::project::list::exec().await?,

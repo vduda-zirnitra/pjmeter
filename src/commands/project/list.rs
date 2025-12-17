@@ -5,7 +5,7 @@ pub async fn exec() -> anyhow::Result<()> {
     let projects =
         projects_settings::settings::get_all_projects(projects_settings::config::db_pool()).await?;
 
-    if projects.len() == 0 {
+    if projects.is_empty() {
         println!(
             "No project found. You can add one using 'pjmeter project add --label <project_label> --path <project_path>'"
         );

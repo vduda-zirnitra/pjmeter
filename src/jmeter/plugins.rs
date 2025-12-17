@@ -288,7 +288,7 @@ async fn download_and_register_plugin(
     spinner.finish_and_clear();
     println!(
         "  [{current_plugin_number}/{total_to_download}] Plugin {plugin_name}-{plugin_version} : {}",
-        format!("{}", style("OK").green().bold())
+        style("OK").green().bold()
     );
 
     Ok(plugin_row)
@@ -353,7 +353,7 @@ fn extract_jar_from_zip(zip_path: &Path, dest_dir: &Path) -> Result<Vec<PathBuf>
             None => continue,
         };
 
-        if enclosed.extension().map_or(false, |e| e == "jar") {
+        if enclosed.extension().is_some_and(|e| e == "jar") {
             let file_name = match enclosed.file_name() {
                 Some(f) => f,
                 None => continue,

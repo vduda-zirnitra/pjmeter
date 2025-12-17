@@ -19,7 +19,7 @@ const JMETER_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/.sandbox/jmeter/
 
 pub fn design_with_jmeter(
     project_config: &ProjectConfig,
-    environment: &String,
+    environment: &str,
     project_dir: &str,
 ) -> Result<()> {
     let mut cmd = init_jmeter_command(project_config, environment, project_dir);
@@ -40,13 +40,13 @@ pub fn design_with_jmeter(
 #[derive(PartialEq)]
 enum ExecutionStatus {
     OK,
-    INTERRUPTED,
-    FAILED,
+    Interrupted,
+    Failed,
 }
 
 pub fn run_with_jmeter(
     project_config: &ProjectConfig,
-    environment: &String,
+    environment: &str,
     plans: Vec<String>,
     project_dir: &str,
 ) -> Result<()> {
@@ -54,7 +54,7 @@ pub fn run_with_jmeter(
 
     let plan_count = plans.len();
     for (i, plan) in plans.iter().enumerate() {
-        let plan_name = io::path::clear_file_extension(&plan);
+        let plan_name = io::path::clear_file_extension(plan);
 
         let pb = ProgressBar::new_spinner()
             .with_message(format!("[{}/{plan_count}] {plan_name}", i + 1));
@@ -134,17 +134,17 @@ pub fn run_with_jmeter(
 
             // If we killed due to inactivity, run the post-kill fixup on the JTL
             if killed_due_to_inactivity {
-                execution_status = ExecutionStatus::INTERRUPTED;
+                execution_status = ExecutionStatus::Interrupted;
                 post_kill(Path::new(&jtl_path))?;
                 pb.set_prefix("DONE");
             } else if !status.success() {
-                execution_status = ExecutionStatus::FAILED;
+                execution_status = ExecutionStatus::Failed;
                 pb.set_prefix(format!("{}", style("FAILED PLAN").red().bold()));
             }
         }
 
         // 2 : génération du rapport
-        if execution_status != ExecutionStatus::FAILED {
+        if execution_status != ExecutionStatus::Failed {
             pb.set_prefix(format!("{}", style("GENERATING REPORT").cyan().bold()));
             let mut cmd = init_jmeter_command(project_config, environment, project_dir);
             cmd.arg("-g").arg(format!(
@@ -167,7 +167,7 @@ pub fn run_with_jmeter(
             fs::remove_file(Path::new(
                 format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl").as_str(),
             ))?;
-            if execution_status != ExecutionStatus::FAILED {
+            if execution_status != ExecutionStatus::Failed {
                 fs::remove_file(Path::new(
                     format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.log")
                         .as_str(),
@@ -179,7 +179,7 @@ pub fn run_with_jmeter(
             ExecutionStatus::OK => {
                 pb.set_prefix(format!("{}", style("DONE").green().bold()));
             }
-            ExecutionStatus::INTERRUPTED => {
+            ExecutionStatus::Interrupted => {
                 pb.set_prefix(format!(
                     "{}",
                     style("DONE (interrupted due to inactivity)")
@@ -187,7 +187,7 @@ pub fn run_with_jmeter(
                         .bold()
                 ));
             }
-            ExecutionStatus::FAILED => {
+            ExecutionStatus::Failed => {
                 pb.set_prefix(format!("{}", style("FAILED").red().bold()));
                 eprintln!(
                     "Check log file a{project_dir}/jmeter/results/{plan_name}_{execution_time}.log"

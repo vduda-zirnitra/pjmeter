@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 pub fn get_tmp_dir() -> PathBuf {
     // Get runtime directory (more secure than /tmp on modern Linux)
-    let base_dir = if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+    if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
         PathBuf::from(runtime_dir)
     } else if let Ok(home) = std::env::var("HOME") {
         // Fallback to user's home directory
@@ -13,9 +13,7 @@ pub fn get_tmp_dir() -> PathBuf {
     } else {
         // Last resort: use /var/tmp which persists across reboots
         PathBuf::from("/var/tmp")
-    };
-
-    base_dir
+    }
 }
 
 pub fn get_path_if_exists(input: &str) -> Result<PathBuf, String> {
@@ -58,18 +56,14 @@ pub fn list_plan_files(project_dir_path: &str) -> Vec<String> {
         Err(_) => return jmx_files, // Returns an empty vector if the directory doesn't exist
     };
 
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == "jmx" {
-                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            jmx_files.push(name.to_string());
-                        }
-                    }
-                }
-            }
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file()
+            && let Some(ext) = path.extension()
+            && ext == "jmx"
+            && let Some(name) = path.file_name().and_then(|n| n.to_str())
+        {
+            jmx_files.push(name.to_string());
         }
     }
     jmx_files
@@ -91,14 +85,14 @@ pub fn init_file(conf_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn panic_if_not_exists(path: &PathBuf) {
+pub fn panic_if_not_exists(path: &Path) {
     if !path.exists() {
         panic!("{} does not exist", path.to_str().unwrap());
     }
 }
 
 pub fn init_app_config_dir(path: &Path, error: &str) {
-    match fs::create_dir_all(&path) {
+    match fs::create_dir_all(path) {
         Ok(_) => (),
         Err(e) => panic!("{error} {}: {}", path.to_str().unwrap(), e),
     }

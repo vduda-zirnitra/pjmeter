@@ -1,5 +1,5 @@
 use crate::db::projects_settings;
-use crate::prompts::prompts;
+use crate::prompts;
 use anyhow::Result;
 
 pub async fn exec(label: Option<&String>) -> Result<()> {

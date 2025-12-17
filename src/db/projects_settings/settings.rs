@@ -8,13 +8,13 @@ pub async fn add_project(
     label: &String,
     absolute_path: &String,
 ) -> Result<SqliteQueryResult, Error> {
-    Ok(sqlx::query!(
+    sqlx::query!(
         "INSERT INTO projects (label, absolute_path) VALUES (?, ?)",
         label,
         absolute_path
     )
     .execute(pool)
-    .await?)
+    .await
 }
 
 pub async fn update_project(
@@ -22,20 +22,20 @@ pub async fn update_project(
     label: &String,
     project: &Project,
 ) -> Result<SqliteQueryResult, Error> {
-    Ok(sqlx::query!(
+    sqlx::query!(
             "UPDATE projects SET label = ?, absolute_path = ?, updated_at = CURRENT_TIMESTAMP WHERE label = ?",
             project.label,
             project.absolute_path,
             label
         )
         .execute(pool)
-        .await?)
+        .await
 }
 
 pub async fn remove_project(pool: &SqlitePool, label: &String) -> Result<SqliteQueryResult, Error> {
-    Ok(sqlx::query!("DELETE FROM projects WHERE label = ?", label)
+    sqlx::query!("DELETE FROM projects WHERE label = ?", label)
         .execute(pool)
-        .await?)
+        .await
 }
 
 pub async fn get_project(pool: &SqlitePool, label: &String) -> Result<Option<Project>, Error> {
@@ -46,7 +46,6 @@ pub async fn get_project(pool: &SqlitePool, label: &String) -> Result<Option<Pro
     )
     .fetch_optional(pool)
     .await
-    .map_err(|err| err)
 }
 
 pub async fn get_all_projects(pool: &SqlitePool) -> Result<Vec<Project>, Error> {
@@ -61,5 +60,4 @@ pub async fn get_all_projects(pool: &SqlitePool) -> Result<Vec<Project>, Error> 
     )
     .fetch_all(pool)
     .await
-    .map_err(|err| err)
 }

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub fn init_jmeter_dir(path: &Path) -> Result<()> {
-    let jmeter_dir = create_sub_dir(&path, "jmeter")?;
+    let jmeter_dir = create_sub_dir(path, "jmeter")?;
     let plans_dir = create_sub_dir(&jmeter_dir, "plans")?;
     let results_dir = create_sub_dir(&jmeter_dir, "results")?;
 

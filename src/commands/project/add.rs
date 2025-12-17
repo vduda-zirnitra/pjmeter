@@ -1,6 +1,6 @@
 use crate::db::projects_settings;
 use crate::io;
-use crate::prompts::prompts;
+use crate::prompts;
 use anyhow::Result;
 use std::process::exit;
 
@@ -15,7 +15,7 @@ pub async fn exec(label: Option<&String>, path: Option<&String>) -> Result<()> {
     };
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(&pool, &label).await? {
+    match projects_settings::settings::get_project(pool, &label).await? {
         Some(some_project) => eprintln!(
             "A project with the label {label} already exists and points to {}",
             some_project.absolute_path
@@ -37,7 +37,7 @@ pub async fn exec(label: Option<&String>, path: Option<&String>) -> Result<()> {
                 exit(1);
             }
 
-            projects_settings::settings::add_project(&pool, &label, &normalised_path).await?;
+            projects_settings::settings::add_project(pool, &label, &normalised_path).await?;
             println!("Added project '{label}' with path : '{normalised_path}'");
         }
     }

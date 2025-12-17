@@ -1,6 +1,6 @@
 use crate::db::projects_settings;
 use crate::io;
-use crate::prompts::prompts;
+use crate::prompts;
 use std::path::Path;
 use std::process::exit;
 
@@ -30,7 +30,7 @@ pub async fn exec(
     }
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(&pool, &label)
+    match projects_settings::settings::get_project(pool, &label)
         .await?
         .as_mut()
     {
@@ -53,7 +53,7 @@ pub async fn exec(
                 }
             }
 
-            match projects_settings::settings::update_project(&pool, &label, updated_project).await
+            match projects_settings::settings::update_project(pool, &label, updated_project).await
             {
                 Ok(_) => println!("Updated project successfully."),
                 Err(e) => eprintln!("An error occurred when updating the project {e}"),

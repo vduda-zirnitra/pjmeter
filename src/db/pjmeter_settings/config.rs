@@ -9,13 +9,12 @@ static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 pub async fn init_db_pool() -> Result<()> {
     let conf_path = get_conf_path();
-    path::init_file(&conf_path).expect(
-        format!(
+    path::init_file(&conf_path).unwrap_or_else(|_| {
+        panic!(
             "Failed to create database file {}",
             conf_path.to_str().unwrap()
         )
-        .as_str(),
-    );
+    });
 
     let database_url = format!("sqlite://{}", conf_path.to_str().unwrap());
 
@@ -28,7 +27,12 @@ pub async fn init_db_pool() -> Result<()> {
         .acquire_timeout(Duration::from_secs(5))
         .connect(&database_url)
         .await
-        .expect(format!("Could not connect to the database, check if {} exists and its read/write permissions.", conf_path.display()).as_str());
+        .unwrap_or_else(|_| {
+            panic!(
+                "Could not connect to the database, check if {} exists and its read/write permissions.",
+                conf_path.display()
+            )
+        });
 
     // Store it in the OnceLock
     DB_POOL.set(pool).map_err(|_| Error::PoolClosed)?;

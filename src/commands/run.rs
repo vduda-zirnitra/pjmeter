@@ -3,7 +3,7 @@ use crate::io;
 use crate::jmeter::plugins::{load_plugins, remove_all_plugin_jars_symlinks};
 use crate::jmeter::runner;
 use crate::project_config::ProjectConfig;
-use crate::prompts::prompts;
+use crate::prompts;
 use anyhow::Result;
 use std::path::Path;
 use std::process::exit;
@@ -29,7 +29,7 @@ pub async fn exec(
     };
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(&pool, &project).await? {
+    match projects_settings::settings::get_project(pool, &project).await? {
         None => {
             eprintln!("Project {project} not found.");
             eprintln!(
@@ -75,7 +75,7 @@ pub async fn exec(
 fn get_plans_to_run(plans: &Vec<String>, project_path: &str) -> Vec<String> {
     let project_plans = io::path::list_plan_files(format!("{project_path}/jmeter/plans").as_str());
 
-    if plans.len() == 0 || plans[0] == "all" {
+    if plans.is_empty() || plans[0] == "all" {
         project_plans
     } else {
         let mut validated_plans: Vec<String> = Vec::new();
