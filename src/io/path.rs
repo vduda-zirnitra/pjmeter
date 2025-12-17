@@ -1,7 +1,7 @@
+use anyhow::Result;
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
 
 pub fn get_tmp_dir() -> PathBuf {
     // Get runtime directory (more secure than /tmp on modern Linux)
@@ -80,7 +80,7 @@ pub fn clear_file_extension(file_name: &str) -> String {
     while p.extension().is_some() {
         p.set_extension("");
     }
-    
+
     p.to_string_lossy().into_owned()
 }
 
@@ -135,28 +135,40 @@ mod tests {
     fn test_validate_and_normalize_path_rejects_relative() {
         let result = validate_and_normalize_path("home/user/project");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Path must be absolute (start with '/')");
+        assert_eq!(
+            result.unwrap_err(),
+            "Path must be absolute (start with '/')"
+        );
     }
 
     #[test]
     fn test_validate_and_normalize_path_rejects_dot() {
         let result = validate_and_normalize_path("/home/./project");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+        assert_eq!(
+            result.unwrap_err(),
+            "Path contains forbidden segments ('.', '..', '~', or empty)"
+        );
     }
 
     #[test]
     fn test_validate_and_normalize_path_rejects_dotdot() {
         let result = validate_and_normalize_path("/home/../project");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+        assert_eq!(
+            result.unwrap_err(),
+            "Path contains forbidden segments ('.', '..', '~', or empty)"
+        );
     }
 
     #[test]
     fn test_validate_and_normalize_path_rejects_tilde() {
         let result = validate_and_normalize_path("/~/project");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Path contains forbidden segments ('.', '..', '~', or empty)");
+        assert_eq!(
+            result.unwrap_err(),
+            "Path contains forbidden segments ('.', '..', '~', or empty)"
+        );
     }
 
     #[test]
@@ -219,12 +231,12 @@ mod tests {
     #[test]
     fn test_list_plan_files_with_jmx_files() {
         let tmp = tempdir().unwrap();
-        
+
         // Create some test files
         fs::write(tmp.path().join("test1.jmx"), "content").unwrap();
         fs::write(tmp.path().join("test2.jmx"), "content").unwrap();
         fs::write(tmp.path().join("readme.txt"), "content").unwrap();
-        
+
         let files = list_plan_files(tmp.path().to_str().unwrap());
         assert_eq!(files.len(), 2);
         assert!(files.contains(&"test1.jmx".to_string()));
@@ -242,7 +254,7 @@ mod tests {
     fn test_init_file_creates_file() {
         let tmp = tempdir().unwrap();
         let file_path = tmp.path().join("test.txt");
-        
+
         assert!(!file_path.exists());
         init_file(&file_path).unwrap();
         assert!(file_path.exists());
@@ -252,13 +264,13 @@ mod tests {
     fn test_init_file_existing_file() {
         let tmp = tempdir().unwrap();
         let file_path = tmp.path().join("test.txt");
-        
+
         fs::write(&file_path, "existing content").unwrap();
         assert!(file_path.exists());
-        
+
         init_file(&file_path).unwrap();
         assert!(file_path.exists());
-        
+
         // Should not overwrite existing file
         let content = fs::read_to_string(&file_path).unwrap();
         assert_eq!(content, "existing content");

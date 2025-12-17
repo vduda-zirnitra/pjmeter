@@ -1,21 +1,27 @@
-use std::fs::{create_dir, File};
+use anyhow::{Context, Result};
+use std::fs::{File, create_dir};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use anyhow::{Result, Context};
-use std::io::{Write};
 
 pub fn init_jmeter_dir(path: &Path) -> Result<()> {
     let jmeter_dir = create_sub_dir(&path, "jmeter")?;
     let plans_dir = create_sub_dir(&jmeter_dir, "plans")?;
     let results_dir = create_sub_dir(&jmeter_dir, "results")?;
 
-    write_file_to_dir(&jmeter_dir, FileTemplates::RootReadme).context("Failed to create README.md in jmeter/ dir")?;
-    write_file_to_dir(&jmeter_dir, FileTemplates::Config).context("Failed to create config.toml in jmeter/ dir")?;
-    write_file_to_dir(&jmeter_dir, FileTemplates::Gitignore).context("Failed to create .gitignore in jmeter/ dir")?;
+    write_file_to_dir(&jmeter_dir, FileTemplates::RootReadme)
+        .context("Failed to create README.md in jmeter/ dir")?;
+    write_file_to_dir(&jmeter_dir, FileTemplates::Config)
+        .context("Failed to create config.toml in jmeter/ dir")?;
+    write_file_to_dir(&jmeter_dir, FileTemplates::Gitignore)
+        .context("Failed to create .gitignore in jmeter/ dir")?;
 
-    write_file_to_dir(&plans_dir, FileTemplates::GitKeep).context("Failed to create .gitkeep in jmeter/plans/ dir")?;
-    write_file_to_dir(&plans_dir, FileTemplates::SamplePlan).context("Failed to create Sample_plan.jmx in jmeter/plans/ dir")?;
+    write_file_to_dir(&plans_dir, FileTemplates::GitKeep)
+        .context("Failed to create .gitkeep in jmeter/plans/ dir")?;
+    write_file_to_dir(&plans_dir, FileTemplates::SamplePlan)
+        .context("Failed to create Sample_plan.jmx in jmeter/plans/ dir")?;
 
-    write_file_to_dir(&results_dir, FileTemplates::GitKeep).context("Failed to create .gitkeep in jmeter/results/ dir")?;
+    write_file_to_dir(&results_dir, FileTemplates::GitKeep)
+        .context("Failed to create .gitkeep in jmeter/results/ dir")?;
 
     Ok(())
 }
@@ -32,7 +38,8 @@ fn create_sub_dir(path: &Path, new_dir: &str) -> Result<PathBuf> {
     let mut path_buf = PathBuf::from(&path);
     path_buf.push(new_dir);
     if !path_buf.exists() {
-        create_dir(&path_buf).context(format!("Could not create directory {}", path_buf.display()))?;
+        create_dir(&path_buf)
+            .context(format!("Could not create directory {}", path_buf.display()))?;
     }
 
     Ok(path_buf)
@@ -91,7 +98,7 @@ mod tests {
     #[test]
     fn test_init_jmeter_dir_idempotent() {
         let tmp = tempdir().unwrap();
-        
+
         // First call
         let result1 = init_jmeter_dir(tmp.path());
         assert!(result1.is_ok());
@@ -121,7 +128,8 @@ mod tests {
         assert!(config_content.contains("[plugins]"));
         assert!(config_content.contains("[env."));
 
-        let plan_content = fs::read_to_string(tmp.path().join("jmeter/plans/a_sample_plan.jmx")).unwrap();
+        let plan_content =
+            fs::read_to_string(tmp.path().join("jmeter/plans/a_sample_plan.jmx")).unwrap();
         assert!(!plan_content.is_empty());
     }
 
@@ -130,7 +138,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let result = create_sub_dir(tmp.path(), "test_dir");
         assert!(result.is_ok());
-        
+
         let created_path = result.unwrap();
         assert!(created_path.exists());
         assert!(created_path.is_dir());

@@ -1,12 +1,12 @@
+use crate::db::projects_settings;
+use crate::io::path;
+use crate::project_config::ProjectConfig;
 use anyhow::Result;
+use console::Term;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::{Input, MultiSelect, Select};
 use std::path::Path;
 use std::process::exit;
-use console::Term;
-use dialoguer::{Input, MultiSelect, Select};
-use dialoguer::theme::ColorfulTheme;
-use crate::db::projects_settings;
-use crate::project_config::ProjectConfig;
-use crate::io::path;
 
 pub async fn prompt_display_main_menu(actions: &[&str]) -> Result<usize> {
     let term = Term::stdout();
@@ -57,7 +57,13 @@ pub async fn prompt_project_selector() -> Result<String> {
 pub async fn prompt_environment_selector(project: &String) -> Result<String> {
     let p_config = get_project_config(&project).await;
 
-    let environments: Vec<String> = p_config.env.custom_environments.keys().into_iter().cloned().collect();
+    let environments: Vec<String> = p_config
+        .env
+        .custom_environments
+        .keys()
+        .into_iter()
+        .cloned()
+        .collect();
     let term = Term::stdout();
     let idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose an environment")
@@ -66,19 +72,19 @@ pub async fn prompt_environment_selector(project: &String) -> Result<String> {
         .interact_on(&term)?;
     term.clear_last_lines(1)?;
 
-
     Ok(environments[idx].clone())
 }
 
 pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
     let pool = projects_settings::config::db_pool();
-    let project_absolute_path = match projects_settings::settings::get_project(&pool, &project).await {
-        Ok(Some(project)) => project.absolute_path,
-        _ => {
-            eprintln!("Failed to get project {project} from database");
-            exit(1);
-        }
-    };
+    let project_absolute_path =
+        match projects_settings::settings::get_project(&pool, &project).await {
+            Ok(Some(project)) => project.absolute_path,
+            _ => {
+                eprintln!("Failed to get project {project} from database");
+                exit(1);
+            }
+        };
 
     let plans = path::list_plan_files(format!("{project_absolute_path}/jmeter/plans").as_str());
 
@@ -100,11 +106,15 @@ pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
 async fn get_project_config(project: &String) -> ProjectConfig {
     let pool = projects_settings::config::db_pool();
     match projects_settings::settings::get_project(&pool, &project).await {
-        Ok(Some(some_project)) => ProjectConfig::open(Path::new(&some_project.absolute_path)).unwrap_or_else(|e| { eprintln!("{e}"); exit(1) }),
+        Ok(Some(some_project)) => ProjectConfig::open(Path::new(&some_project.absolute_path))
+            .unwrap_or_else(|e| {
+                eprintln!("{e}");
+                exit(1)
+            }),
         _ => {
             eprintln!("Failed to get project {project} from database");
             exit(1);
-        },
+        }
     }
 }
 
@@ -128,15 +138,18 @@ pub async fn get_project_label_from_prompt() -> String {
                     continue;
                 }
                 match projects_settings::settings::get_project(&pool, &label).await {
-                    Ok(Some(some_project)) => eprintln!("A project with the label {label} already exists and points to {}", some_project.absolute_path),
+                    Ok(Some(some_project)) => eprintln!(
+                        "A project with the label {label} already exists and points to {}",
+                        some_project.absolute_path
+                    ),
                     Ok(None) => return label,
                     Err(e) => {
                         eprintln!("Failed to read database {e}");
                         exit(1);
                     }
                 }
-            },
-            _ => continue
+            }
+            _ => continue,
         }
     }
 }
@@ -144,17 +157,14 @@ pub async fn get_project_label_from_prompt() -> String {
 pub async fn get_project_path_from_prompt() -> String {
     loop {
         match prompt_for_input("Project path:") {
-            Ok(path) => {
-                match path::validate_and_normalize_path(&path) {
-                    Ok(normalized_path) => {
-                        match path::get_path_if_exists(&normalized_path) {
-                            Ok(_) => return path,
-                            _ => println!("Invalid path. Enter a valid path.")}
-                    },
+            Ok(path) => match path::validate_and_normalize_path(&path) {
+                Ok(normalized_path) => match path::get_path_if_exists(&normalized_path) {
+                    Ok(_) => return path,
                     _ => println!("Invalid path. Enter a valid path."),
-                }
-            }
-            _ => continue
+                },
+                _ => println!("Invalid path. Enter a valid path."),
+            },
+            _ => continue,
         }
     }
 }

@@ -66,4 +66,14 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Run clippy
-      run: cargo clippy --all-targets -- -D warnings
+      run: |
+        # Set up database for clippy (sqlx needs it for compile-time checks)
+        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/build-check.db"
+        if [ ! -f "$(pwd)/target/sqlx/build-check.db" ]; then
+          # If build database doesn't exist, create a fresh one
+          mkdir -p target/sqlx
+          sqlx database create --database-url "$DATABASE_URL"
+          sqlx migrate run --source migrations/pjmeter_settings --database-url "$DATABASE_URL"
+          sqlx migrate run --source migrations/projects_settings --database-url "$DATABASE_URL"
+        fi
+        cargo clippy --all-targets -- -D warnings

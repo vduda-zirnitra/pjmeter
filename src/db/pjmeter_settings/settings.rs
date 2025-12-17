@@ -2,7 +2,12 @@ use crate::models::plugin::Plugin;
 use anyhow::Result;
 use sqlx::{Error, SqlitePool};
 
-pub async fn add_plugin(pool: &SqlitePool, name: &str, version: &str, jars: Vec<String>) -> Result<(), Error> {
+pub async fn add_plugin(
+    pool: &SqlitePool,
+    name: &str,
+    version: &str,
+    jars: Vec<String>,
+) -> Result<(), Error> {
     let mut jar_ids = Vec::with_capacity(jars.len());
     for file_name in jars {
         let id: i64 = sqlx::query_scalar!(
@@ -45,7 +50,7 @@ pub async fn add_plugin(pool: &SqlitePool, name: &str, version: &str, jars: Vec<
     Ok(())
 }
 
-pub async fn get_plugin(pool: &SqlitePool, name: &str, version: &str,) -> Result<Plugin, Error> {
+pub async fn get_plugin(pool: &SqlitePool, name: &str, version: &str) -> Result<Plugin, Error> {
     let rows = sqlx::query!(
         r#"
         SELECT

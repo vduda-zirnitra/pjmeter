@@ -1,15 +1,15 @@
-use std::fs;
-use std::path::{Path, PathBuf };
+use crate::io;
+use crate::project_config::ProjectConfig;
 use anyhow::Result;
-use std::process::{Command, Stdio, ExitStatus};
+use console::style;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::fs;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use std::io::{Read, Seek, SeekFrom};
-use indicatif::{ProgressBar, ProgressStyle};
-use console::{style};
-use crate::project_config::ProjectConfig;
-use crate::io;
 
 #[cfg(not(debug_assertions))]
 const JMETER_PATH: &str = "/opt/pjmeter/jmeter/bin/jmeter";
@@ -17,9 +17,14 @@ const JMETER_PATH: &str = "/opt/pjmeter/jmeter/bin/jmeter";
 #[cfg(debug_assertions)]
 const JMETER_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/.sandbox/jmeter/bin/jmeter");
 
-pub fn design_with_jmeter(project_config: &ProjectConfig, environment: &String, project_dir: &str) -> Result<()> {
+pub fn design_with_jmeter(
+    project_config: &ProjectConfig,
+    environment: &String,
+    project_dir: &str,
+) -> Result<()> {
     let mut cmd = init_jmeter_command(project_config, environment, project_dir);
-    cmd.arg("-j").arg(format!("{project_dir}/jmeter/logs/jmeter.log"));
+    cmd.arg("-j")
+        .arg(format!("{project_dir}/jmeter/logs/jmeter.log"));
 
     if let Some(default_plan) = &project_config.jmeter.default_test_plan {
         cmd.arg("-t").arg(default_plan);
@@ -39,7 +44,12 @@ enum ExecutionStatus {
     FAILED,
 }
 
-pub fn run_with_jmeter(project_config: &ProjectConfig, environment: &String, plans: Vec<String>, project_dir: &str) -> Result<()> {
+pub fn run_with_jmeter(
+    project_config: &ProjectConfig,
+    environment: &String,
+    plans: Vec<String>,
+    project_dir: &str,
+) -> Result<()> {
     let execution_time = chrono::Local::now().format("%Y%m%dT%H%M%S").to_string();
 
     let plan_count = plans.len();
@@ -48,21 +58,25 @@ pub fn run_with_jmeter(project_config: &ProjectConfig, environment: &String, pla
 
         let pb = ProgressBar::new_spinner()
             .with_message(format!("[{}/{plan_count}] {plan_name}", i + 1));
-        pb.set_style(
-            ProgressStyle::with_template("{spinner:.green} {msg} - {elapsed_precise} : {prefix}")?,
-        );
+        pb.set_style(ProgressStyle::with_template(
+            "{spinner:.green} {msg} - {elapsed_precise} : {prefix}",
+        )?);
         pb.enable_steady_tick(Duration::from_millis(80));
 
         let mut execution_status = ExecutionStatus::OK;
 
-        { // 1 : éxécution du test
+        {
+            // 1 : éxécution du test
             pb.set_prefix(format!("{}", style("SETTING UP").cyan().bold()));
             let mut cmd = init_jmeter_command(project_config, environment, project_dir);
             let jtl_path = format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl");
             cmd.arg("-n");
-            cmd.arg("-t").arg(format!("{project_dir}/jmeter/plans/{plan}"));
+            cmd.arg("-t")
+                .arg(format!("{project_dir}/jmeter/plans/{plan}"));
             cmd.arg("-l").arg(&jtl_path);
-            cmd.arg("-j").arg(format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.log"));
+            cmd.arg("-j").arg(format!(
+                "{project_dir}/jmeter/results/{plan_name}_{execution_time}.log"
+            ));
 
             let mut jmeter_process = cmd.spawn()?;
             pb.set_prefix(format!("{}", style("RUNNING PLAN").cyan().bold()));
@@ -133,8 +147,12 @@ pub fn run_with_jmeter(project_config: &ProjectConfig, environment: &String, pla
         if execution_status != ExecutionStatus::FAILED {
             pb.set_prefix(format!("{}", style("GENERATING REPORT").cyan().bold()));
             let mut cmd = init_jmeter_command(project_config, environment, project_dir);
-            cmd.arg("-g").arg(format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl"));
-            cmd.arg("-o").arg(format!("{project_dir}/jmeter/results/{plan_name}_{environment}_{execution_time}"));
+            cmd.arg("-g").arg(format!(
+                "{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl"
+            ));
+            cmd.arg("-o").arg(format!(
+                "{project_dir}/jmeter/results/{plan_name}_{environment}_{execution_time}"
+            ));
 
             let mut jmeter_process = cmd.spawn()?;
             let status = jmeter_process.wait()?;
@@ -143,20 +161,37 @@ pub fn run_with_jmeter(project_config: &ProjectConfig, environment: &String, pla
             }
         }
 
-        { // 3 : suppression des fichiers temporaires
+        {
+            // 3 : suppression des fichiers temporaires
             pb.set_prefix(format!("{}", style("CLEANING").cyan().bold()));
-            fs::remove_file(Path::new(format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl").as_str()))?;
+            fs::remove_file(Path::new(
+                format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.jtl").as_str(),
+            ))?;
             if execution_status != ExecutionStatus::FAILED {
-                fs::remove_file(Path::new(format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.log").as_str()))?;
+                fs::remove_file(Path::new(
+                    format!("{project_dir}/jmeter/results/{plan_name}_{execution_time}.log")
+                        .as_str(),
+                ))?;
             }
         }
 
         match execution_status {
-            ExecutionStatus::OK => { pb.set_prefix(format!("{}", style("DONE").green().bold())); }
-            ExecutionStatus::INTERRUPTED => { pb.set_prefix(format!("{}", style("DONE (interrupted due to inactivity)").yellow().bold())); }
+            ExecutionStatus::OK => {
+                pb.set_prefix(format!("{}", style("DONE").green().bold()));
+            }
+            ExecutionStatus::INTERRUPTED => {
+                pb.set_prefix(format!(
+                    "{}",
+                    style("DONE (interrupted due to inactivity)")
+                        .yellow()
+                        .bold()
+                ));
+            }
             ExecutionStatus::FAILED => {
                 pb.set_prefix(format!("{}", style("FAILED").red().bold()));
-                eprintln!("Check log file a{project_dir}/jmeter/results/{plan_name}_{execution_time}.log");
+                eprintln!(
+                    "Check log file a{project_dir}/jmeter/results/{plan_name}_{execution_time}.log"
+                );
             }
         }
 
@@ -166,13 +201,22 @@ pub fn run_with_jmeter(project_config: &ProjectConfig, environment: &String, pla
     Ok(())
 }
 
-fn init_jmeter_command(project_config: &ProjectConfig, environment: &str, project_dir: &str) -> Command {
+fn init_jmeter_command(
+    project_config: &ProjectConfig,
+    environment: &str,
+    project_dir: &str,
+) -> Command {
     let mut cmd = Command::new(JMETER_PATH);
     cmd.current_dir(format!("{project_dir}/jmeter/plans"));
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
-    for (env_var, value) in project_config.env.custom_environments.get(environment).unwrap() {
+    for (env_var, value) in project_config
+        .env
+        .custom_environments
+        .get(environment)
+        .unwrap()
+    {
         // Gestion distincte entre les Strings et les autres types.
         if let Some(s) = value.as_str() {
             cmd.env(env_var, s);
@@ -362,10 +406,10 @@ mod tests {
     #[test]
     fn test_post_kill_large_file() {
         use std::io::{BufRead, BufReader};
-        
+
         let tmp = tempdir().unwrap();
         let file_path = tmp.path().join("large.jtl");
-        
+
         // Create a file larger than CHUNK size (128KB)
         let mut file = fs::File::create(&file_path).unwrap();
         for i in 0..10000 {
@@ -384,7 +428,7 @@ mod tests {
         let line_count_after = BufReader::new(file_after).lines().count();
 
         assert_eq!(line_count_after, line_count_before - 1);
-        
+
         // Check file ends with newline
         let metadata = fs::metadata(&file_path).unwrap();
         if metadata.len() > 0 {

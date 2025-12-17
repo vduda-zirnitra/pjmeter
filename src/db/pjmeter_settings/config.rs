@@ -1,6 +1,6 @@
 use crate::io::path;
 use anyhow::Result;
-use sqlx::{migrate, sqlite::SqlitePoolOptions, Connection, Error, SqliteConnection, SqlitePool};
+use sqlx::{Connection, Error, SqliteConnection, SqlitePool, migrate, sqlite::SqlitePoolOptions};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -9,7 +9,13 @@ static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 pub async fn init_db_pool() -> Result<()> {
     let conf_path = get_conf_path();
-    path::init_file(&conf_path).expect(format!("Failed to create database file {}", conf_path.to_str().unwrap()).as_str());
+    path::init_file(&conf_path).expect(
+        format!(
+            "Failed to create database file {}",
+            conf_path.to_str().unwrap()
+        )
+        .as_str(),
+    );
 
     let database_url = format!("sqlite://{}", conf_path.to_str().unwrap());
 
@@ -25,14 +31,15 @@ pub async fn init_db_pool() -> Result<()> {
         .expect(format!("Could not connect to the database, check if {} exists and its read/write permissions.", conf_path.display()).as_str());
 
     // Store it in the OnceLock
-    DB_POOL.set(pool)
-        .map_err(|_| Error::PoolClosed)?;
+    DB_POOL.set(pool).map_err(|_| Error::PoolClosed)?;
 
     Ok(())
 }
 
 pub fn db_pool() -> &'static SqlitePool {
-    DB_POOL.get().expect("Database pool not initialized. Call init_db_pool() first.")
+    DB_POOL
+        .get()
+        .expect("Database pool not initialized. Call init_db_pool() first.")
 }
 
 fn get_conf_path() -> PathBuf {
