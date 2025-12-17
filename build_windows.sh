@@ -8,6 +8,7 @@ MAINTAINER="${MAINTAINER:-Your Name <you@example.com>}"
 DESCRIPTION="${DESCRIPTION:-PJMeter: Rust-based tool bundling Apache JMeter}"
 RUST_BUILD_TARGET="${RUST_BUILD_TARGET:-x86_64-pc-windows-gnu}"   # Windows target
 STRIP_BINARIES="${STRIP_BINARIES:-1}"        # 1 to strip binary if possible
+USE_INNO_SETUP="${USE_INNO_SETUP:-1}"        # 1 to create installer with Inno Setup, 0 for ZIP
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # Source JMeter's version
 . "$SCRIPT_DIR/JMETER_VERSION.sh"
@@ -79,6 +80,49 @@ else
   exit 1
 fi
 
+if [[ "${USE_INNO_SETUP}" == "1" ]]; then
+  # Create installer with Inno Setup
+  echo "Creating Windows installer with Inno Setup..."
+  
+  # Check for Inno Setup
+  ISCC=""
+  if command -v iscc >/dev/null 2>&1; then
+    ISCC="iscc"
+  elif command -v wine >/dev/null 2>&1 && [[ -f "/usr/share/innosetup/ISCC.exe" ]]; then
+    ISCC="wine /usr/share/innosetup/ISCC.exe"
+  elif [[ -f "$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]]; then
+    ISCC="wine \"$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 6/ISCC.exe\""
+  else
+    echo "Warning: Inno Setup not found. Falling back to ZIP archive."
+    echo "To use Inno Setup on Linux, install via:"
+    echo "  sudo apt-get install wine innoextract"
+    echo "  Download Inno Setup from https://jrsoftware.org/isdl.php"
+    USE_INNO_SETUP="0"
+  fi
+  
+  if [[ "${USE_INNO_SETUP}" == "1" ]]; then
+    # Export environment variables for Inno Setup script
+    export SOURCE_DIR="${REPO_ROOT}"
+    export CARGO_VERSION
+    export JMETER_VERSION
+    
+    # Run Inno Setup
+    mkdir -p "${BUILD_DIR}"
+    eval $ISCC "${REPO_ROOT}/installer/windows/pjmeter.iss"
+    
+    OUT_INSTALLER="${BUILD_DIR}/pjmeter_${CARGO_VERSION}_windows_x86_64_installer.exe"
+    if [[ -f "${OUT_INSTALLER}" ]]; then
+      echo "Done: ${OUT_INSTALLER}"
+      echo "Run the installer to install pjmeter on Windows"
+      exit 0
+    else
+      echo "Error: Installer not created. Falling back to ZIP."
+      USE_INNO_SETUP="0"
+    fi
+  fi
+fi
+
+# Fallback to ZIP or if USE_INNO_SETUP=0
 # Create README for installation
 cat > "${PKG_DIR}/README.txt" << 'EOF'
 PJMeter for Windows

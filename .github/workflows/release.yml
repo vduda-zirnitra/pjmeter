@@ -20,11 +20,11 @@ jobs:
           - os: ubuntu-latest
             platform: windows
             build_script: ./build_windows.sh
-            artifact_pattern: build/windows/*.zip
+            artifact_pattern: build/windows/*
           - os: macos-latest
             platform: macos
             build_script: ./build_macos.sh
-            artifact_pattern: build/macos/*.tar.gz
+            artifact_pattern: build/macos/*
 
     runs-on: ${{ matrix.os }}
 

@@ -8,6 +8,7 @@ MAINTAINER="${MAINTAINER:-Your Name <you@example.com>}"
 DESCRIPTION="${DESCRIPTION:-PJMeter: Rust-based tool bundling Apache JMeter}"
 RUST_BUILD_TARGET="${RUST_BUILD_TARGET:-x86_64-apple-darwin}"   # macOS target (Intel)
 STRIP_BINARIES="${STRIP_BINARIES:-1}"        # 1 to strip binary if possible
+CREATE_DMG="${CREATE_DMG:-1}"                # 1 to create DMG, 0 for tar.gz
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # Source JMeter's version
 . "$SCRIPT_DIR/JMETER_VERSION.sh"
@@ -57,9 +58,16 @@ if [[ ! -f "${BIN_PATH}" ]]; then
   exit 1
 fi
 
-# Prepare staging directory (using macOS directory structure)
+# Prepare staging directory
 PKG_DIR="${BUILD_DIR}/${PACKAGE_NAME}_${CARGO_VERSION}"
-APP_DIR="${PKG_DIR}/Applications/pjmeter"
+if [[ "${CREATE_DMG}" == "1" ]]; then
+  # For DMG, create pjmeter directory directly (will be copied to DMG)
+  APP_DIR="${PKG_DIR}/pjmeter"
+else
+  # For tar.gz, use Applications/pjmeter structure
+  APP_DIR="${PKG_DIR}/Applications/pjmeter"
+fi
+
 rm -rf "${PKG_DIR}"
 mkdir -p "${APP_DIR}/bin"
 mkdir -p "${APP_DIR}/jmeter"
@@ -85,6 +93,45 @@ if [[ -d "${JMX_SRC_DIR}" ]]; then
 else
   echo "ERROR: ${JMX_SRC_DIR} not found."
   exit 1
+fi
+
+if [[ "${CREATE_DMG}" == "1" ]]; then
+  # Create DMG with drag-and-drop installation
+  echo "Creating DMG installer..."
+  
+  OUT_DMG="${BUILD_DIR}/${PACKAGE_NAME}_${CARGO_VERSION}_macos_x86_64.dmg"
+  mkdir -p "${BUILD_DIR}"
+  
+  # Use the DMG creation script
+  if [[ -x "${REPO_ROOT}/installer/macos/create_dmg.sh" ]]; then
+    "${REPO_ROOT}/installer/macos/create_dmg.sh" \
+      "${APP_DIR}" \
+      "${OUT_DMG}" \
+      "PJMeter ${CARGO_VERSION}" \
+      "${CARGO_VERSION}"
+    
+    if [[ -f "${OUT_DMG}" ]]; then
+      echo "Done: ${OUT_DMG}"
+      echo "Open the DMG and drag pjmeter to Applications folder"
+      exit 0
+    else
+      echo "Warning: DMG creation failed. Falling back to tar.gz"
+      CREATE_DMG="0"
+    fi
+  else
+    echo "Warning: DMG creation script not found. Falling back to tar.gz"
+    CREATE_DMG="0"
+  fi
+fi
+
+# Fallback to tar.gz or if CREATE_DMG=0
+# Need to restructure if we're in DMG mode
+if [[ ! -d "${PKG_DIR}/Applications" ]]; then
+  # Restructure to Applications/pjmeter format
+  TMP_APP_DIR="${PKG_DIR}/Applications/pjmeter"
+  mkdir -p "$(dirname "${TMP_APP_DIR}")"
+  mv "${APP_DIR}" "${TMP_APP_DIR}"
+  APP_DIR="${TMP_APP_DIR}"
 fi
 
 # Create README for installation
@@ -122,20 +169,17 @@ set -e
 echo "Installing pjmeter to /Applications/pjmeter..."
 sudo cp -r Applications/pjmeter /Applications/
 
+echo "Creating symlink in /usr/local/bin..."
+sudo mkdir -p /usr/local/bin
+sudo ln -sf /Applications/pjmeter/bin/pjmeter /usr/local/bin/pjmeter
+
 echo "Creating global configuration directory..."
 sudo mkdir -p "/Library/Application Support/pjmeter"
 sudo chmod 755 "/Library/Application Support/pjmeter"
 
 echo ""
 echo "Installation complete!"
-echo ""
-echo "To use pjmeter, add this line to your ~/.zshrc or ~/.bash_profile:"
-echo "  export PATH=\"/Applications/pjmeter/bin:\$PATH\""
-echo ""
-echo "Then reload your shell configuration:"
-echo "  source ~/.zshrc  # or source ~/.bash_profile"
-echo ""
-echo "After that, you can run: pjmeter --help"
+echo "You can now run 'pjmeter' from any terminal window."
 EOF
 chmod +x "${PKG_DIR}/install.sh"
 
