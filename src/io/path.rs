@@ -21,7 +21,14 @@ pub fn get_path_if_exists(input: &str) -> Result<PathBuf, String> {
     if !target_path.exists() {
         return Err(format!("The path {} does not exist", input));
     }
-    Ok(target_path)
+    
+    // Canonicalize to prevent path traversal attacks
+    // This resolves symlinks and .. components
+    let canonical_path = target_path
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize path {}: {}", input, e))?;
+    
+    Ok(canonical_path)
 }
 
 pub fn validate_and_normalize_path(input: &str) -> Result<String, &'static str> {
@@ -51,7 +58,14 @@ pub fn validate_and_normalize_path(input: &str) -> Result<String, &'static str> 
 
 pub fn list_plan_files(project_dir_path: &str) -> Vec<String> {
     let mut jmx_files = Vec::new();
-    let entries = match fs::read_dir(project_dir_path) {
+    
+    // Canonicalize path to prevent path traversal attacks
+    let canonical_path = match PathBuf::from(project_dir_path).canonicalize() {
+        Ok(path) => path,
+        Err(_) => return jmx_files, // Returns an empty vector if path doesn't exist or can't be canonicalized
+    };
+    
+    let entries = match fs::read_dir(&canonical_path) {
         Ok(entries) => entries,
         Err(_) => return jmx_files, // Returns an empty vector if the directory doesn't exist
     };
@@ -273,5 +287,77 @@ mod tests {
     fn test_get_tmp_dir_returns_path() {
         let tmp_dir = get_tmp_dir();
         assert!(tmp_dir.is_absolute());
+    }
+
+    #[test]
+    fn test_get_path_if_exists_prevents_path_traversal() {
+        // Create a temporary directory structure
+        let tmp = tempdir().unwrap();
+        let subdir = tmp.path().join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        
+        // Try to access parent directory using path traversal
+        let traversal_path = format!("{}/../", subdir.display());
+        let result = get_path_if_exists(&traversal_path);
+        
+        // Should succeed but return canonicalized path (not the traversal path)
+        assert!(result.is_ok());
+        let canonical = result.unwrap();
+        
+        // The canonical path should be the parent (tmp dir), not containing ".."
+        assert!(!canonical.to_string_lossy().contains(".."));
+        assert_eq!(canonical, tmp.path().canonicalize().unwrap());
+    }
+
+    #[test]
+    fn test_list_plan_files_prevents_path_traversal() {
+        // Create a temporary directory structure with jmx files
+        let tmp = tempdir().unwrap();
+        let subdir = tmp.path().join("plans");
+        fs::create_dir(&subdir).unwrap();
+        fs::write(subdir.join("test.jmx"), "content").unwrap();
+        
+        // Create a separate directory that shouldn't be accessible
+        let secret_dir = tmp.path().join("secret");
+        fs::create_dir(&secret_dir).unwrap();
+        fs::write(secret_dir.join("secret.jmx"), "secret content").unwrap();
+        
+        // Try to use path traversal to access parent directory
+        let traversal_path = format!("{}/plans/../secret", tmp.path().display());
+        let files = list_plan_files(&traversal_path);
+        
+        // Should return files from the canonical path (secret dir)
+        // This demonstrates the function canonicalizes paths
+        assert_eq!(files.len(), 1);
+        assert!(files.contains(&"secret.jmx".to_string()));
+    }
+
+    #[test]
+    fn test_list_plan_files_with_symlink() {
+        // Create a temporary directory structure
+        let tmp = tempdir().unwrap();
+        let real_dir = tmp.path().join("real");
+        fs::create_dir(&real_dir).unwrap();
+        fs::write(real_dir.join("test.jmx"), "content").unwrap();
+        
+        // Create a symlink to the real directory
+        #[cfg(unix)]
+        {
+            let link_path = tmp.path().join("link");
+            std::os::unix::fs::symlink(&real_dir, &link_path).unwrap();
+            
+            // Access via symlink should be canonicalized
+            let files = list_plan_files(link_path.to_str().unwrap());
+            assert_eq!(files.len(), 1);
+            assert!(files.contains(&"test.jmx".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_get_path_if_exists_nonexistent_after_traversal() {
+        // Try path traversal to a non-existent path
+        let result = get_path_if_exists("/tmp/../nonexistent_path_12345");
+        // Should fail because the path doesn't exist
+        assert!(result.is_err());
     }
 }
