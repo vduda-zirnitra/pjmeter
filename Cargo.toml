@@ -2,8 +2,8 @@
 name = "pjmeter"
 version = "0.1.1"
 edition = "2024"
+rust-version = "1.85.0"
 authors = ["Victor Duda"]
-repository = "https://gitlab.bordeaux.sqli.com/vduda/packaged-jmeter"
 description = "A helping tool to execute JMeter test plans on any project"
 
 [dependencies]
