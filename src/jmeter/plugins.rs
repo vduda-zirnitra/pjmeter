@@ -29,7 +29,7 @@ fn get_local_plugins_path() -> PathBuf {
     #[cfg(not(debug_assertions))]
     {
         let mut path = PathBuf::new();
-        
+
         #[cfg(target_os = "windows")]
         {
             if let Ok(program_data) = std::env::var("PROGRAMDATA") {
@@ -38,22 +38,22 @@ fn get_local_plugins_path() -> PathBuf {
                 path.push("C:\\ProgramData");
             }
         }
-        
+
         #[cfg(target_os = "macos")]
         {
             path.push("/Library/Application Support");
         }
-        
+
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
             path.push("/opt");
         }
-        
+
         path.push("pjmeter");
         path.push("jmeter_plugins");
         path
     }
-    
+
     #[cfg(debug_assertions)]
     {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -67,7 +67,7 @@ fn get_jmeter_plugin_path() -> PathBuf {
     #[cfg(not(debug_assertions))]
     {
         let mut path = PathBuf::new();
-        
+
         // Platform-specific program files directory
         #[cfg(target_os = "windows")]
         {
@@ -77,24 +77,24 @@ fn get_jmeter_plugin_path() -> PathBuf {
                 path.push("C:\\Program Files");
             }
         }
-        
+
         #[cfg(target_os = "macos")]
         {
             path.push("/Applications");
         }
-        
+
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
             path.push("/opt");
         }
-        
+
         path.push("pjmeter");
         path.push("jmeter");
         path.push("lib");
         path.push("ext");
         path
     }
-    
+
     #[cfg(debug_assertions)]
     {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -573,7 +573,7 @@ async fn download_and_register_plugin(
         }
     }
 
-    // On non-Unix systems, skip the group change step  
+    // On non-Unix systems, skip the group change step
     #[cfg(not(unix))]
     let _ = (group_name, &spinner); // Suppress unused warnings
 
