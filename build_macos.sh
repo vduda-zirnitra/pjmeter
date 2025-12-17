@@ -71,8 +71,8 @@ chmod 0755 "${APP_DIR}/bin/${BINARY_NAME}"
 
 # Optionally strip binary to reduce size
 if [[ "${STRIP_BINARIES}" == "1" ]]; then
-  # Try cross-compiler strip first, then fallback to regular strip
-  if [[ -n "${RUST_BUILD_TARGET}" ]] && command -v "${RUST_BUILD_TARGET}-strip" >/dev/null 2>&1; then
+  # Try target-specific strip first (useful when cross-compiling), then fallback to regular strip
+  if command -v "${RUST_BUILD_TARGET}-strip" >/dev/null 2>&1; then
     "${RUST_BUILD_TARGET}-strip" "${APP_DIR}/bin/${BINARY_NAME}" 2>/dev/null || true
   elif command -v strip >/dev/null 2>&1; then
     strip "${APP_DIR}/bin/${BINARY_NAME}" 2>/dev/null || true

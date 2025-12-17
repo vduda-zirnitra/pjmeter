@@ -105,17 +105,18 @@ For more information, visit: https://github.com/vduda-zirnitra/pjmeter
 EOF
 
 # Create a ZIP archive
+if ! command -v zip >/dev/null 2>&1; then
+  echo "Error: 'zip' command not found. Please install it:"
+  echo "  - Ubuntu/Debian: sudo apt-get install zip"
+  echo "  - macOS: brew install zip"
+  exit 1
+fi
+
 OUT_ZIP="${BUILD_DIR}/${PACKAGE_NAME}_${CARGO_VERSION}_windows_x86_64.zip"
 mkdir -p "${BUILD_DIR}"
 echo "Creating ${OUT_ZIP} ..."
 cd "${BUILD_DIR}"
-if command -v zip >/dev/null 2>&1; then
-  zip -r "$(basename "${OUT_ZIP}")" "$(basename "${PKG_DIR}")"
-else
-  echo "Warning: zip command not found. Trying with tar..."
-  tar -czf "${PACKAGE_NAME}_${CARGO_VERSION}_windows_x86_64.tar.gz" "$(basename "${PKG_DIR}")"
-  OUT_ZIP="${BUILD_DIR}/${PACKAGE_NAME}_${CARGO_VERSION}_windows_x86_64.tar.gz"
-fi
+zip -r "$(basename "${OUT_ZIP}")" "$(basename "${PKG_DIR}")"
 cd "${REPO_ROOT}"
 
 echo "Done: ${OUT_ZIP}"
