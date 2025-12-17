@@ -54,9 +54,13 @@ pub fn db_pool() -> &'static SqlitePool {
 fn get_conf_path() -> Result<PathBuf> {
     let mut conf_path = PathBuf::new();
     if !cfg!(debug_assertions) {
-        conf_path.push(get_home_dir()?);
-        conf_path.push(".local/share");
-        path::check_path_exists(&conf_path)?;
+        // Use platform-specific user data directory
+        // This uses the `dirs` crate which provides cross-platform paths:
+        // - Windows: %LOCALAPPDATA% (e.g., C:\Users\<user>\AppData\Local)
+        // - macOS: ~/Library/Application Support
+        // - Linux: ~/.local/share
+        conf_path = dirs::data_local_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find user data directory"))?;
         conf_path.push("pjmeter");
         path::init_app_config_dir(&conf_path, "Could not create app config directory")?;
         conf_path.push("config.db");
@@ -68,10 +72,6 @@ fn get_conf_path() -> Result<PathBuf> {
     }
 
     Ok(conf_path)
-}
-
-fn get_home_dir() -> Result<PathBuf> {
-    dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))
 }
 
 async fn update_database(database_url: &str) -> Result<()> {

@@ -10,26 +10,98 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::ErrorKind;
+// Platform-specific imports for symlinks
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
+#[cfg(unix)]
 use uzers::get_group_by_name;
 
 const JMETER_PLUGIN_PACKAGES: &str = "https://jmeter-plugins.org/files/packages/";
-#[cfg(not(debug_assertions))]
-const LOCAL_PLUGINS_PATH: &str = "/opt/pjmeter/jmeter_plugins/";
 
-#[cfg(debug_assertions)]
-const LOCAL_PLUGINS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/.sandbox/jmeter_plugins/");
+fn get_local_plugins_path() -> PathBuf {
+    let mut path = PathBuf::new();
 
-#[cfg(not(debug_assertions))]
-const JMETER_PLUGIN_PATH: &str = "/opt/pjmeter/jmeter/lib/ext/";
+    #[cfg(not(debug_assertions))]
+    {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(program_data) = std::env::var("PROGRAMDATA") {
+                path.push(program_data);
+            } else {
+                path.push("C:\\ProgramData");
+            }
+            path.push("pjmeter");
+            path.push("jmeter_plugins");
+        }
 
-#[cfg(debug_assertions)]
-const JMETER_PLUGIN_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/.sandbox/jmeter/lib/ext/");
+        #[cfg(target_os = "macos")]
+        {
+            path.push("/Library/Application Support/pjmeter/jmeter_plugins");
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            path.push("/opt/pjmeter/jmeter_plugins");
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push(".sandbox");
+        path.push("jmeter_plugins");
+    }
+
+    path
+}
+
+fn get_jmeter_plugin_path() -> PathBuf {
+    let mut path = PathBuf::new();
+
+    #[cfg(not(debug_assertions))]
+    {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(program_files) = std::env::var("PROGRAMFILES") {
+                path.push(program_files);
+            } else {
+                path.push("C:\\Program Files");
+            }
+            path.push("pjmeter");
+            path.push("jmeter");
+            path.push("lib");
+            path.push("ext");
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            path.push("/Applications/pjmeter/jmeter/lib/ext");
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            path.push("/opt/pjmeter/jmeter/lib/ext");
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push(".sandbox");
+        path.push("jmeter");
+        path.push("lib");
+        path.push("ext");
+    }
+
+    path
+}
 
 #[derive(Debug, Deserialize)]
 struct PackageList {
@@ -80,8 +152,8 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
         println!();
     }
 
-    let available_plugins_path = PathBuf::from(LOCAL_PLUGINS_PATH);
-    let jmeter_plugin_path = PathBuf::from(JMETER_PLUGIN_PATH);
+    let available_plugins_path = get_local_plugins_path();
+    let jmeter_plugin_path = get_jmeter_plugin_path();
     for plugin in available_plugins.iter() {
         for jar in plugin.jars.iter() {
             let target_path = available_plugins_path.join(jar);
@@ -120,7 +192,7 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
     }
 
     // Validate that target is within the expected plugin directory
-    let expected_plugin_dir = PathBuf::from(LOCAL_PLUGINS_PATH);
+    let expected_plugin_dir = get_local_plugins_path();
     let target_canonical = target.canonicalize().map_err(|e| {
         anyhow!(
             "Failed to canonicalize target path: {} - {e}",
@@ -153,7 +225,7 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
         ));
     }
 
-    let expected_jmeter_dir = PathBuf::from(JMETER_PLUGIN_PATH);
+    let expected_jmeter_dir = get_jmeter_plugin_path();
     let link_parent_canonical = link_parent.canonicalize().map_err(|e| {
         anyhow!(
             "Failed to canonicalize link parent directory: {} - {e}",
@@ -170,7 +242,7 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
     if link_parent_canonical != jmeter_canonical {
         return Err(anyhow!(
             "Link must be created within jmeter plugin directory: {}",
-            JMETER_PLUGIN_PATH
+            expected_jmeter_dir.display()
         ));
     }
 
@@ -232,9 +304,15 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
         }
     }
 
-    // Create the symlink
+    // Create the symlink (platform-specific)
     // Note: On Unix, symlink() is atomic and will fail if the path already exists
-    match symlink(target, link) {
+    #[cfg(unix)]
+    let symlink_result = symlink(target, link);
+
+    #[cfg(windows)]
+    let symlink_result = symlink_file(target, link);
+
+    match symlink_result {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == ErrorKind::AlreadyExists => {
             // Race condition: symlink was created between our check and creation
@@ -286,7 +364,7 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
 /// Security: This function validates each symlink before removal to ensure it points
 /// to the expected plugin directory, preventing accidental deletion of legitimate system files.
 pub fn remove_all_plugin_jars_symlinks() -> Result<u64> {
-    let dir = PathBuf::from(JMETER_PLUGIN_PATH);
+    let dir = get_jmeter_plugin_path();
     let mut removed = 0u64;
 
     // Validate the directory exists and is the expected jmeter plugin directory
@@ -297,7 +375,7 @@ pub fn remove_all_plugin_jars_symlinks() -> Result<u64> {
         )
     })?;
 
-    let expected_plugin_dir = PathBuf::from(LOCAL_PLUGINS_PATH);
+    let expected_plugin_dir = get_local_plugins_path();
     let expected_canonical = expected_plugin_dir.canonicalize().map_err(|e| {
         anyhow!(
             "Failed to access plugin storage directory: {} - {e}",
@@ -480,13 +558,22 @@ async fn download_and_register_plugin(
 
     // Extracting
     spinner.set_prefix(format!("{}", style("EXTRACTING").cyan().bold()));
-    let extracted_jars_paths = extract_jar_from_zip(&zip_path, Path::new(LOCAL_PLUGINS_PATH))?;
+    let extracted_jars_paths = extract_jar_from_zip(&zip_path, &get_local_plugins_path())?;
     let _ = fs::remove_file(&zip_path);
 
-    // Applying rights
-    spinner.set_prefix(format!("{}", style("APPLYING RIGHTS").cyan().bold()));
-    for path in &extracted_jars_paths {
-        change_group(path, group_name)?;
+    // Applying rights (Unix-only)
+    #[cfg(unix)]
+    {
+        spinner.set_prefix(format!("{}", style("APPLYING RIGHTS").cyan().bold()));
+        for path in &extracted_jars_paths {
+            change_group(path, group_name)?;
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        // On non-Unix systems, skip the group change step
+        let _ = group_name; // Suppress unused variable warning
     }
 
     // Registering in DB
@@ -603,6 +690,7 @@ fn extract_jar_from_zip(zip_path: &Path, dest_dir: &Path) -> Result<Vec<PathBuf>
     }
 }
 
+#[cfg(unix)]
 fn change_group(path: &Path, group_name: &str) -> Result<()> {
     let _ =
         get_group_by_name(group_name).ok_or_else(|| anyhow!("Group {} not found", group_name))?;
@@ -698,6 +786,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_change_group_fail_invalid_group() {
         let tmp = tempdir().unwrap();
         let jar_path = tmp.path().join("some.jar");
@@ -796,6 +885,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_remove_symlinks_validates_targets() {
         let tmp = tempdir().unwrap();
 
@@ -826,6 +916,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_symlink_security_broken_symlink_handling() {
         let tmp = tempdir().unwrap();
         let target = tmp.path().join("target.jar");

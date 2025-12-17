@@ -54,8 +54,30 @@ pub fn db_pool() -> &'static SqlitePool {
 fn get_conf_path() -> Result<PathBuf> {
     let mut conf_path = PathBuf::new();
     if !cfg!(debug_assertions) {
-        conf_path.push("/var/opt/");
-        path::check_path_exists(&conf_path)?;
+        // Use platform-specific global/system data directory
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: Use ProgramData (e.g., C:\ProgramData\pjmeter)
+            if let Ok(program_data) = std::env::var("PROGRAMDATA") {
+                conf_path.push(program_data);
+            } else {
+                // Fallback to C:\ProgramData
+                conf_path.push("C:\\ProgramData");
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: Use /Library/Application Support
+            conf_path.push("/Library/Application Support");
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            // Linux and other Unix-like systems: Use /var/opt
+            conf_path.push("/var/opt");
+        }
+
         conf_path.push("pjmeter");
         path::init_app_config_dir(&conf_path, "Could not create app config directory")?;
         conf_path.push("config.db");

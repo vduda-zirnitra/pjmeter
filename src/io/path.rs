@@ -4,16 +4,12 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub fn get_tmp_dir() -> PathBuf {
-    // Get runtime directory (more secure than /tmp on modern Linux)
-    if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-        PathBuf::from(runtime_dir)
-    } else if let Ok(home) = std::env::var("HOME") {
-        // Fallback to user's home directory
-        PathBuf::from(home).join(".cache").join("tmp")
-    } else {
-        // Last resort: use /var/tmp which persists across reboots
-        PathBuf::from("/var/tmp")
-    }
+    // Use std::env::temp_dir() which is cross-platform
+    // It returns the appropriate temp directory for the OS:
+    // - Windows: %TEMP% or %TMP%
+    // - Unix: $TMPDIR or /tmp
+    // - macOS: $TMPDIR or /tmp
+    std::env::temp_dir()
 }
 
 pub fn get_path_if_exists(input: &str) -> Result<PathBuf, String> {
@@ -32,28 +28,34 @@ pub fn get_path_if_exists(input: &str) -> Result<PathBuf, String> {
 }
 
 pub fn validate_and_normalize_path(input: &str) -> Result<String, &'static str> {
-    // 1. Must start with a single /
-    if !input.starts_with('/') {
-        return Err("Path must be absolute (start with '/')");
+    use std::path::{Component, Path};
+
+    let path = Path::new(input);
+
+    // 1. Must be absolute
+    if !path.is_absolute() {
+        return Err("Path must be absolute");
     }
+
     // 2. Forbid forbidden components
-    let forbidden = [".", "..", "~"];
-    for segment in input.split('/') {
-        if forbidden.contains(&segment) {
-            return Err("Path contains forbidden segments ('.', '..', '~', or empty)");
-        }
-        if segment.chars().any(|c| c.is_whitespace()) {
-            return Err("Path contains whitespace in segments");
+    // Note: Path::components() automatically normalizes CurDir (.) but keeps ParentDir (..)
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                return Err("Path contains forbidden segments ('..')");
+            }
+            Component::Normal(os_str) => {
+                let component_str = os_str.to_string_lossy();
+                if component_str.starts_with('~') {
+                    return Err("Path contains forbidden segments ('~')");
+                }
+            }
+            _ => {} // RootDir, Prefix (Windows), CurDir are fine
         }
     }
-    // 3. Remove trailing '/' if not root
-    let normalized = if input != "/" && input.ends_with('/') {
-        // Remove trailing slashes
-        input.trim_end_matches('/').to_string()
-    } else {
-        input.to_string()
-    };
-    Ok(normalized)
+
+    // 3. Return the path as a string (keep original format for Windows compatibility)
+    Ok(input.to_string())
 }
 
 pub fn list_plan_files(project_dir_path: &str) -> Vec<String> {
@@ -99,13 +101,6 @@ pub fn init_file(conf_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn check_path_exists(path: &Path) -> Result<()> {
-    if !path.exists() {
-        return Err(anyhow::anyhow!("{} does not exist", path.display()));
-    }
-    Ok(())
-}
-
 pub fn init_app_config_dir(path: &Path, error: &str) -> Result<()> {
     fs::create_dir_all(path).map_err(|e| anyhow::anyhow!("{error} {}: {}", path.display(), e))?;
     Ok(())
@@ -118,20 +113,23 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_validate_and_normalize_path_valid_absolute() {
+    #[cfg(unix)]
+    fn test_validate_and_normalize_path_valid_absolute_unix() {
         let result = validate_and_normalize_path("/home/user/project");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "/home/user/project");
     }
 
     #[test]
-    fn test_validate_and_normalize_path_removes_trailing_slash() {
-        let result = validate_and_normalize_path("/home/user/project/");
+    #[cfg(windows)]
+    fn test_validate_and_normalize_path_valid_absolute_windows() {
+        let result = validate_and_normalize_path("C:\\Users\\user\\project");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "/home/user/project");
+        assert_eq!(result.unwrap(), "C:\\Users\\user\\project");
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_validate_and_normalize_path_keeps_root() {
         let result = validate_and_normalize_path("/");
         assert!(result.is_ok());
@@ -142,47 +140,73 @@ mod tests {
     fn test_validate_and_normalize_path_rejects_relative() {
         let result = validate_and_normalize_path("home/user/project");
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Path must be absolute (start with '/')"
-        );
+        assert_eq!(result.unwrap_err(), "Path must be absolute");
     }
 
     #[test]
-    fn test_validate_and_normalize_path_rejects_dot() {
+    #[cfg(unix)]
+    fn test_validate_and_normalize_path_accepts_dot_unix() {
+        // Note: Path::components() automatically normalizes '.' so it's harmless
+        // The path is effectively treated as /home/project
         let result = validate_and_normalize_path("/home/./project");
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Path contains forbidden segments ('.', '..', '~', or empty)"
-        );
+        assert!(result.is_ok());
     }
 
     #[test]
-    fn test_validate_and_normalize_path_rejects_dotdot() {
+    #[cfg(windows)]
+    fn test_validate_and_normalize_path_accepts_dot_windows() {
+        // Note: Path::components() automatically normalizes '.' so it's harmless
+        let result = validate_and_normalize_path("C:\\home\\.\\project");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_validate_and_normalize_path_rejects_dotdot_unix() {
         let result = validate_and_normalize_path("/home/../project");
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "Path contains forbidden segments ('.', '..', '~', or empty)"
+            "Path contains forbidden segments ('..')"
         );
     }
 
     #[test]
+    #[cfg(windows)]
+    fn test_validate_and_normalize_path_rejects_dotdot_windows() {
+        let result = validate_and_normalize_path("C:\\home\\..\\project");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Path contains forbidden segments ('..')"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn test_validate_and_normalize_path_rejects_tilde() {
         let result = validate_and_normalize_path("/~/project");
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "Path contains forbidden segments ('.', '..', '~', or empty)"
+            "Path contains forbidden segments ('~')"
         );
     }
 
     #[test]
-    fn test_validate_and_normalize_path_rejects_whitespace() {
+    #[cfg(unix)]
+    fn test_validate_and_normalize_path_allows_whitespace_unix() {
+        // Whitespace should now be allowed as it's valid in paths on all platforms
         let result = validate_and_normalize_path("/home/user name/project");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Path contains whitespace in segments");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_validate_and_normalize_path_allows_whitespace_windows() {
+        // Whitespace is common in Windows paths (e.g., "Program Files")
+        let result = validate_and_normalize_path("C:\\Program Files\\pjmeter");
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -287,6 +311,8 @@ mod tests {
     fn test_get_tmp_dir_returns_path() {
         let tmp_dir = get_tmp_dir();
         assert!(tmp_dir.is_absolute());
+        // Verify it's an actual temp directory that exists
+        assert!(tmp_dir.exists() || tmp_dir.parent().is_some_and(|p| p.exists()));
     }
 
     #[test]
@@ -333,6 +359,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_list_plan_files_with_symlink() {
         // Create a temporary directory structure
         let tmp = tempdir().unwrap();
@@ -341,16 +368,13 @@ mod tests {
         fs::write(real_dir.join("test.jmx"), "content").unwrap();
 
         // Create a symlink to the real directory
-        #[cfg(unix)]
-        {
-            let link_path = tmp.path().join("link");
-            std::os::unix::fs::symlink(&real_dir, &link_path).unwrap();
+        let link_path = tmp.path().join("link");
+        std::os::unix::fs::symlink(&real_dir, &link_path).unwrap();
 
-            // Access via symlink should be canonicalized
-            let files = list_plan_files(link_path.to_str().unwrap());
-            assert_eq!(files.len(), 1);
-            assert!(files.contains(&"test.jmx".to_string()));
-        }
+        // Access via symlink should be canonicalized
+        let files = list_plan_files(link_path.to_str().unwrap());
+        assert_eq!(files.len(), 1);
+        assert!(files.contains(&"test.jmx".to_string()));
     }
 
     #[test]
