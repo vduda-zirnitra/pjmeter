@@ -16,7 +16,7 @@ use std::process::Command;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
-use users::get_group_by_name;
+use uzers::get_group_by_name;
 
 const JMETER_PLUGIN_PACKAGES: &str = "https://jmeter-plugins.org/files/packages/";
 #[cfg(not(debug_assertions))]
