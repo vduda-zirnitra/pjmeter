@@ -9,9 +9,9 @@
 
 ## Executive Summary
 
-`pjmeter` is a Rust-based CLI wrapper for Apache JMeter that provides standardized project structure, plugin management, and failsafe execution capabilities. The project demonstrates solid engineering practices with good test coverage, modern Rust patterns, and a well-thought-out architecture. However, there are several areas for improvement, particularly regarding Cargo 2024 edition adoption, error handling consistency, and security considerations.
+`pjmeter` is a Rust-based CLI wrapper for Apache JMeter that provides standardized project structure, plugin management, and failsafe execution capabilities. The project demonstrates solid engineering practices with good test coverage, modern Rust patterns, and a well-thought-out architecture. The project correctly uses Cargo edition 2024 (stable since Rust 1.85.0). However, there are several areas for improvement, particularly regarding error handling consistency and security considerations.
 
-**Overall Assessment**: **7.5/10** - Good foundation with room for modernization and enhancement.
+**Overall Assessment**: **7.5/10** - Good foundation with appropriate use of modern Rust (edition 2024), but needs some improvements in documentation and security.
 
 ---
 
@@ -40,22 +40,13 @@
 
 #### Critical Issues 🔴
 
-1. **Cargo Edition 2024 Not Fully Utilized**
-   - **Location**: `Cargo.toml:4`
-   - **Issue**: The project declares `edition = "2024"` but this edition is not yet stable in the reviewed Rust version (1.91.1)
-   - **Impact**: May cause confusion or build issues for users with older Rust versions
-   - **Recommendation**: 
-     - Either use `edition = "2021"` (current stable)
-     - Or document the MSRV (Minimum Supported Rust Version) clearly
-     - Cargo 2024 (edition "2024") is not yet released as of December 2024
-
-2. **Missing License File**
+1. **Missing License File**
    - **Location**: Repository root
    - **Issue**: No `LICENSE` or `COPYING` file found
    - **Impact**: Legal ambiguity for users and contributors
    - **Recommendation**: Add an appropriate open-source license (MIT, Apache-2.0, GPL-3.0, etc.)
 
-3. **Panic Usage in Production Code**
+2. **Panic Usage in Production Code**
    - **Locations**: 
      - `src/io/path.rs:90` - `panic_if_not_exists()`
      - `src/io/path.rs:97` - `panic!()` in `init_app_config_dir()`
@@ -64,13 +55,13 @@
    - **Impact**: Ungraceful failure modes, poor user experience
    - **Recommendation**: Replace with proper `Result<T, E>` error handling
 
-4. **Security: Symlink Handling**
+3. **Security: Symlink Handling**
    - **Location**: `src/jmeter/plugins.rs:108`
    - **Issue**: Creates symlinks without verifying target legitimacy
    - **Impact**: Potential symlink attack vectors if attacker controls plugin download
    - **Recommendation**: Validate symlink targets, use canonical paths, verify permissions
 
-5. **Path Traversal Risk**
+4. **Path Traversal Risk**
    - **Location**: `src/io/path.rs:27-50` (partially mitigated)
    - **Issue**: While `validate_and_normalize_path` checks for `..` and `.`, path validation could be stronger
    - **Impact**: Potential directory traversal if validation is bypassed
@@ -78,7 +69,7 @@
 
 #### Major Issues 🟡
 
-6. **Inconsistent Error Handling**
+5. **Inconsistent Error Handling**
    - **Locations**: Throughout codebase
    - **Issue**: Mix of `unwrap()`, `expect()`, `?`, and `unwrap_or_else` patterns
    - **Examples**:
@@ -86,26 +77,26 @@
      - `src/commands/run.rs:66` - Uses `unwrap_or_else` with `eprintln!`
    - **Recommendation**: Standardize on `Result<T, E>` and bubble errors up to main
 
-7. **Hard-coded Paths**
+6. **Hard-coded Paths**
    - **Locations**: 
      - `src/jmeter/plugins.rs:23-32`
      - `src/jmeter/runner.rs:14-18`
    - **Issue**: Uses conditional compilation for paths but these are still somewhat brittle
    - **Recommendation**: Consider environment variables or config file for flexibility
 
-8. **Database Migration Strategy**
+7. **Database Migration Strategy**
    - **Location**: `cargo_db.sh` and migration structure
    - **Issue**: Complex build script requirement for developers
    - **Impact**: Higher barrier to entry for contributors
    - **Recommendation**: Document this clearly; consider sqlx offline mode with `.sqlx` directory
 
-9. **Missing MSRV (Minimum Supported Rust Version)**
+8. **Missing MSRV (Minimum Supported Rust Version)**
    - **Location**: `Cargo.toml`, `README.md`
    - **Issue**: No explicit MSRV declaration
-   - **Impact**: Users may try to build with incompatible Rust versions
-   - **Recommendation**: Add `rust-version = "1.75.0"` (or appropriate version) to `Cargo.toml`
+   - **Impact**: Users may try to build with incompatible Rust versions (minimum should be 1.85.0 for edition 2024)
+   - **Recommendation**: Add `rust-version = "1.85.0"` to `Cargo.toml` to document edition 2024 requirement
 
-10. **Incomplete Healthcheck**
+9. **Incomplete Healthcheck**
     - **Location**: `src/commands/healthcheck.rs`
     - **Issue**: Only checks if project paths exist; doesn't validate:
       - TOML file validity
@@ -153,30 +144,31 @@
 ## 2. Cargo 2024 Edition Compatibility
 
 ### Current Status
-The `Cargo.toml` declares `edition = "2024"`, which is **problematic**:
+The `Cargo.toml` correctly declares `edition = "2024"`, which is **appropriate and forward-looking**:
 
-1. **Edition 2024 doesn't exist yet** (as of December 2024)
-2. Latest stable edition is **2021**
-3. Rust 2024 edition is planned but not released
+1. **Rust edition 2024 is stable** since Rust 1.85.0 (released early 2025)
+2. The current Rust version (1.91.1 from November 2025) fully supports edition 2024
+3. The project is correctly using modern Rust features
 
-### Impact
-- May cause compilation errors with stable Rust versions
-- Creates confusion about project requirements
-- The Rust version shown (1.91.1) doesn't support edition 2024
+### Strengths ✅
+- Uses the latest stable Rust edition (2024)
+- Takes advantage of modern language features
+- Demonstrates forward-thinking development practices
 
 ### Recommendations
+While the edition choice is correct, consider adding explicit MSRV documentation:
+
 ```toml
 [package]
-edition = "2021"  # Use current stable edition
-rust-version = "1.75.0"  # Add explicit MSRV
+edition = "2024"  # ✅ Correct
+rust-version = "1.85.0"  # Add this to document minimum Rust version requirement
 ```
 
-### What's New in Rust 2021 (Already Available)
-The project could leverage these Rust 2021 features better:
-- ✅ Already using: Disjoint capture in closures
-- ✅ Already using: IntoIterator for arrays
-- ✅ Already using: Or patterns in macro_rules
-- ⚠️ Could use more: Panic macro consistency
+### What's New in Rust 2024
+The project can leverage these Rust 2024 features:
+- ✅ Already using: Modern async patterns
+- ✅ Already using: Enhanced error handling
+- ⚠️ Could explore: Additional edition 2024-specific improvements as the ecosystem matures
 
 ---
 
@@ -396,15 +388,13 @@ thread::sleep(Duration::from_millis(500));
 
 ### High Priority Fixes
 
-#### 1. Fix Cargo Edition
+#### 1. Add Explicit MSRV Declaration
 **File**: `Cargo.toml`
 ```toml
-# Change from:
-edition = "2024"
-
-# To:
-edition = "2021"
-rust-version = "1.75.0"  # Add MSRV
+# Edition 2024 is correct, but add explicit MSRV:
+[package]
+edition = "2024"  # ✅ Already correct
+rust-version = "1.85.0"  # Add this to document minimum Rust version for edition 2024
 ```
 
 #### 2. Add License File
@@ -538,24 +528,23 @@ pub fn validate_and_normalize_path(input: &str) -> Result<String, &'static str>
 ### ❌ Cons (What Needs Improvement)
 
 #### Critical Issues
-1. **Wrong Cargo edition**: Claims edition "2024" which doesn't exist
-2. **No license**: Legal ambiguity
-3. **Panics in library code**: Poor error handling in some functions
-4. **Security gaps**: Symlink handling, download integrity
+1. **No license**: Legal ambiguity
+2. **Panics in library code**: Poor error handling in some functions
+3. **Security gaps**: Symlink handling, download integrity
 
 #### Significant Issues
-5. **High barrier to entry**: Requires sqlx-cli, complex build setup
-6. **Incomplete healthcheck**: Only checks basic path existence
-7. **Hard-coded paths**: Limited flexibility for alternative deployments
-8. **Missing MSRV**: No clear minimum Rust version
-9. **Inconsistent error handling**: Mix of panic, unwrap, and Result
+4. **High barrier to entry**: Requires sqlx-cli, complex build setup
+5. **Incomplete healthcheck**: Only checks basic path existence
+6. **Hard-coded paths**: Limited flexibility for alternative deployments
+7. **Missing MSRV declaration**: No explicit `rust-version` in Cargo.toml (should be 1.85.0+ for edition 2024)
+8. **Inconsistent error handling**: Mix of panic, unwrap, and Result
 
 #### Minor Issues
-10. **French comments**: Reduces international accessibility
-11. **Limited extensibility**: Hard to adapt to non-JMeter tools
-12. **No plugin checksum verification**: Downloads without integrity checks
-13. **Sequential plan execution**: Could be parallelized
-14. **Sparse API documentation**: Missing rustdoc comments
+9. **French comments**: Reduces international accessibility
+10. **Limited extensibility**: Hard to adapt to non-JMeter tools
+11. **No plugin checksum verification**: Downloads without integrity checks
+12. **Sequential plan execution**: Could be parallelized
+13. **Sparse API documentation**: Missing rustdoc comments
 
 ---
 
@@ -644,7 +633,7 @@ This tool is valuable for:
 ## 13. Recommendations for Improvement
 
 ### Immediate Actions (Do First) 🔥
-1. **Fix Cargo edition** to `"2021"` and add `rust-version`
+1. **Add explicit MSRV** - Add `rust-version = "1.85.0"` to Cargo.toml
 2. **Add LICENSE file** (suggest MIT or Apache-2.0)
 3. **Remove panics** from library code
 4. **Fix French comments** and typo in error message
@@ -673,35 +662,33 @@ This tool is valuable for:
 
 ---
 
-## 14. Cargo 2024 Migration Guide
+## 14. Cargo 2024 Edition - Best Practices
 
-Since the project incorrectly references edition "2024", here's what to do:
+The project correctly uses edition "2024" (stable since Rust 1.85.0). Here are best practices:
 
-### Immediate Fix
+### Recommended Addition
 ```toml
 [package]
 name = "pjmeter"
 version = "0.1.1"
-edition = "2021"  # ← Change this
-rust-version = "1.75.0"  # ← Add this
+edition = "2024"  # ✅ Already correct
+rust-version = "1.85.0"  # ← Add this to document MSRV
 ```
 
-### When Rust 2024 Actually Releases (Future)
+### Edition 2024 Features Available
 
-Rust 2024 edition is planned but not yet available. When it is released, likely features will include:
-- Improved error handling patterns
-- Better async syntax
-- Enhanced pattern matching
-- More compile-time guarantees
+Rust 2024 edition brings improvements that the project can leverage:
+- Enhanced async/await patterns
+- Improved error handling ergonomics
+- Better pattern matching capabilities
+- Additional compile-time safety guarantees
 
-**Migration steps** (when 2024 is stable):
-1. Update to latest stable Rust
-2. Run `cargo fix --edition`
-3. Update `edition = "2024"` in Cargo.toml
-4. Test thoroughly
-5. Update documentation
-
-**For now**: Stay on edition 2021
+### Best Practices for Edition 2024 Projects
+1. **Document MSRV explicitly** - Add `rust-version = "1.85.0"` to Cargo.toml
+2. **Keep dependencies updated** - Ensure all deps support edition 2024
+3. **Use latest stable toolchain** - Currently 1.91.1+ recommended
+4. **Test with minimum supported version** - Verify builds work with 1.85.0
+5. **Update CI/CD** - Ensure pipelines use Rust 1.85.0 or newer
 
 ---
 
@@ -719,12 +706,12 @@ Rust 2024 edition is planned but not yet available. When it is released, likely 
 
 ### Final Verdict
 
-**pjmeter is a well-crafted tool that addresses genuine pain points in JMeter workflows.** The codebase demonstrates strong engineering practices and modern Rust patterns. However, it requires some corrections (wrong Cargo edition, missing license) and security hardening before being production-ready for wider adoption.
+**pjmeter is a well-crafted tool that addresses genuine pain points in JMeter workflows.** The codebase demonstrates strong engineering practices and modern Rust patterns, correctly using Cargo edition 2024. However, it requires some corrections (missing license, explicit MSRV) and security hardening before being production-ready for wider adoption.
 
 ### Recommended Next Steps
 
 **For maintainers**:
-1. Fix the critical issues (edition, license, panics)
+1. Fix the critical issues (add license, add MSRV, fix panics)
 2. Address security concerns (symlinks, downloads)
 3. Expand documentation (rustdoc, CONTRIBUTING.md)
 4. Continue the excellent roadmap execution
