@@ -9,12 +9,20 @@ static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 pub async fn init_db_pool() -> Result<()> {
     let conf_path = get_conf_path()?;
-    path::init_file(&conf_path)
-        .map_err(|e| anyhow::anyhow!("Failed to create database file {}: {}", conf_path.display(), e))?;
+    path::init_file(&conf_path).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to create database file {}: {}",
+            conf_path.display(),
+            e
+        )
+    })?;
 
-    let database_url = format!("sqlite://{}", 
-        conf_path.to_str()
-            .ok_or_else(|| anyhow::anyhow!("Database path contains invalid UTF-8: {}", conf_path.display()))?
+    let database_url = format!(
+        "sqlite://{}",
+        conf_path.to_str().ok_or_else(|| anyhow::anyhow!(
+            "Database path contains invalid UTF-8: {}",
+            conf_path.display()
+        ))?
     );
 
     // Run your database updates first

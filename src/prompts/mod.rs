@@ -93,7 +93,7 @@ async fn get_project_config(project: &String) -> Result<ProjectConfig> {
     let some_project = projects_settings::settings::get_project(pool, project)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Project '{}' not found in database", project))?;
-    
+
     ProjectConfig::open(Path::new(&some_project.absolute_path))
         .map_err(|e| anyhow::anyhow!("{}", e))
 }

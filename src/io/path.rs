@@ -93,8 +93,7 @@ pub fn check_path_exists(path: &Path) -> Result<()> {
 }
 
 pub fn init_app_config_dir(path: &Path, error: &str) -> Result<()> {
-    fs::create_dir_all(path)
-        .map_err(|e| anyhow::anyhow!("{error} {}: {}", path.display(), e))?;
+    fs::create_dir_all(path).map_err(|e| anyhow::anyhow!("{error} {}: {}", path.display(), e))?;
     Ok(())
 }
 

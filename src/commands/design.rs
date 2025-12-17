@@ -33,7 +33,9 @@ pub async fn exec(project: &Option<String>, environment: &Option<String>) -> Res
     if !p_config.env.custom_environments.contains_key(&environment) {
         return Err(anyhow::anyhow!(
             "Environment {} not found for project {}\nCheck the environment in {}/jmeter/config.toml",
-            environment, project, some_project.absolute_path
+            environment,
+            project,
+            some_project.absolute_path
         ));
     }
 

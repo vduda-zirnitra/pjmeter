@@ -24,7 +24,9 @@ pub async fn exec(
     });
 
     if new_name.is_none() && path.is_none() {
-        return Err(anyhow::anyhow!("A new name and/or a new path need to be provided to update the project"));
+        return Err(anyhow::anyhow!(
+            "A new name and/or a new path need to be provided to update the project"
+        ));
     }
 
     let pool = projects_settings::config::db_pool();
@@ -43,7 +45,10 @@ pub async fn exec(
                 if Path::new(&normalised_path).exists() {
                     updated_project.absolute_path = normalised_path;
                 } else {
-                    return Err(anyhow::anyhow!("New path doesn't exist: {}", normalised_path));
+                    return Err(anyhow::anyhow!(
+                        "New path doesn't exist: {}",
+                        normalised_path
+                    ));
                 }
             }
 
