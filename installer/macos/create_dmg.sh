@@ -85,11 +85,13 @@ if command -v hdiutil >/dev/null 2>&1; then
     -ov -format UDZO \
     "${OUTPUT_DMG}"
 elif command -v genisoimage >/dev/null 2>&1; then
-  # On Linux, use genisoimage (creates ISO, not DMG, but functional)
-  echo "Warning: hdiutil not available. Creating ISO instead of DMG."
+  # On Linux, use genisoimage to create an ISO (not a true DMG, but mountable on macOS)
+  echo "Warning: hdiutil not available. Creating ISO with .dmg extension."
+  echo "Note: This is an ISO file, not a true DMG, but it will work on macOS."
   OUTPUT_ISO="${OUTPUT_DMG%.dmg}.iso"
   genisoimage -V "${VOLUME_NAME}" -D -R -apple -no-pad \
     -o "${OUTPUT_ISO}" "${TEMP_DIR}"
+  # Keep .dmg extension for consistency, though it's technically an ISO
   mv "${OUTPUT_ISO}" "${OUTPUT_DMG}"
 else
   echo "Error: Neither hdiutil nor genisoimage found."

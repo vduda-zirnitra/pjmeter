@@ -86,12 +86,17 @@ if [[ "${USE_INNO_SETUP}" == "1" ]]; then
   
   # Check for Inno Setup
   ISCC=""
-  if command -v iscc >/dev/null 2>&1; then
+  # Allow override via environment variable
+  if [[ -n "${INNO_SETUP_ISCC:-}" ]]; then
+    ISCC="${INNO_SETUP_ISCC}"
+  elif command -v iscc >/dev/null 2>&1; then
     ISCC="iscc"
   elif command -v wine >/dev/null 2>&1 && [[ -f "/usr/share/innosetup/ISCC.exe" ]]; then
     ISCC="wine /usr/share/innosetup/ISCC.exe"
   elif [[ -f "$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 6/ISCC.exe" ]]; then
     ISCC="wine \"$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 6/ISCC.exe\""
+  elif [[ -f "$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 5/ISCC.exe" ]]; then
+    ISCC="wine \"$HOME/.wine/drive_c/Program Files (x86)/Inno Setup 5/ISCC.exe\""
   else
     echo "Warning: Inno Setup not found. Falling back to ZIP archive."
     echo "To use Inno Setup on Linux, install via:"

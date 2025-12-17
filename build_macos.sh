@@ -169,6 +169,12 @@ set -e
 echo "Installing pjmeter to /Applications/pjmeter..."
 sudo cp -r Applications/pjmeter /Applications/
 
+# Verify the binary was copied successfully
+if [[ ! -f "/Applications/pjmeter/bin/pjmeter" ]]; then
+    echo "Error: Binary not found at /Applications/pjmeter/bin/pjmeter"
+    exit 1
+fi
+
 echo "Creating symlink in /usr/local/bin..."
 sudo mkdir -p /usr/local/bin
 sudo ln -sf /Applications/pjmeter/bin/pjmeter /usr/local/bin/pjmeter
