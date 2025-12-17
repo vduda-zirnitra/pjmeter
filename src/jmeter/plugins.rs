@@ -184,6 +184,16 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
                     anyhow!("Failed to read existing symlink: {} - {e}", link.display())
                 })?;
 
+                // Check if the existing target exists before trying to canonicalize
+                // If it doesn't exist, the symlink is broken and should be replaced
+                if !existing_target.exists() {
+                    return Err(anyhow!(
+                        "Existing symlink points to non-existent target: {} -> {}",
+                        link.display(),
+                        existing_target.display()
+                    ));
+                }
+
                 // Canonicalize the existing target to compare
                 let existing_target_canonical = existing_target.canonicalize().map_err(|e| {
                     anyhow!(
@@ -235,6 +245,15 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
                     link.display()
                 )
             })?;
+
+            // Check if the target exists before trying to canonicalize
+            if !existing_target.exists() {
+                return Err(anyhow!(
+                    "Race condition: symlink was created pointing to non-existent target. Link: {}, Target: {}",
+                    link.display(),
+                    existing_target.display()
+                ));
+            }
 
             let existing_target_canonical = existing_target.canonicalize().map_err(|e| {
                 anyhow!(
@@ -792,7 +811,7 @@ mod tests {
 
         // Create a symlink in jmeter dir pointing to the plugin
         let symlink_path = jmeter_dir.join("plugin.jar");
-        std::os::unix::fs::symlink(&plugin_file, &symlink_path).unwrap();
+        symlink(&plugin_file, &symlink_path).unwrap();
 
         // Verify symlink exists
         assert!(symlink_path.exists());
@@ -816,7 +835,7 @@ mod tests {
         fs::write(&target, "content").unwrap();
 
         // Create symlink
-        std::os::unix::fs::symlink(&target, &link).unwrap();
+        symlink(&target, &link).unwrap();
         assert!(link.exists());
 
         // Remove target (making symlink broken)
