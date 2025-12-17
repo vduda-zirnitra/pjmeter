@@ -16,8 +16,31 @@ Packaged-JMeter allows developers to have unified JMeter directory structure in 
 ## Installation
 
 ### Prebuilt binaries
-- Download from Releases: <releases-url>
-- Install with : sudo dpkg -i "pjmeter_<version>-<debian_version>_<architecture>.deb"
+Download from [Releases](https://github.com/vduda-zirnitra/pjmeter/releases)
+
+#### Linux (Debian/Ubuntu)
+```bash
+sudo dpkg -i pjmeter_<version>-<debian_version>_<architecture>.deb
+```
+
+#### Windows
+1. Download `pjmeter_<version>_windows_x86_64.zip`
+2. Extract to `C:\Program Files\pjmeter\` (or any location)
+3. Add `C:\Program Files\pjmeter\bin` to your PATH environment variable
+4. Create `C:\ProgramData\pjmeter` directory for global configuration
+
+#### macOS
+1. Download `pjmeter_<version>_macos_x86_64.tar.gz`
+2. Extract the archive
+3. Run `sudo ./install.sh` or manually:
+   ```bash
+   sudo cp -r Applications/pjmeter /Applications/
+   sudo mkdir -p "/Library/Application Support/pjmeter"
+   ```
+4. Add to your PATH in `~/.zshrc` or `~/.bash_profile`:
+   ```bash
+   export PATH="/Applications/pjmeter/bin:$PATH"
+   ```
  
 ### Runtime prerequisites
 
@@ -220,7 +243,34 @@ The developer can find the SQLite database file in `~/.local/share/pjmeter/confi
 
 
 ## Releasing
-- Update version (SemVer), changelog
+
+### Automated Release (Recommended)
+- Update version (SemVer) in `Cargo.toml` and changelog
 - Tag and push: `git tag vX.Y.Z && git push --tags`
-- Build debian file: `./build_debian.sh`
-- Create a release on Gitlab with the generated .deb file.
+- GitHub Actions will automatically:
+  - Build binaries for Linux (Debian), Windows, and macOS
+  - Run tests for all platforms
+  - Create a GitHub release with all artifacts attached
+
+### Manual Build (For Testing)
+You can manually build packages for each platform:
+
+**Linux (Debian):**
+```bash
+./build_debian.sh
+# Output: build/deb/pjmeter_<version>-<revision>_<arch>.deb
+```
+
+**Windows:**
+```bash
+./build_windows.sh
+# Output: build/windows/pjmeter_<version>_windows_x86_64.zip
+# Note: Requires x86_64-pc-windows-gnu target: rustup target add x86_64-pc-windows-gnu
+```
+
+**macOS:**
+```bash
+./build_macos.sh
+# Output: build/macos/pjmeter_<version>_macos_x86_64.tar.gz
+# Note: Best built on macOS, but can cross-compile with x86_64-apple-darwin target
+```
