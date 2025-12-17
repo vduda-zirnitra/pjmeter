@@ -54,8 +54,7 @@ pub async fn exec(
         &environment,
         plans_to_run,
         &some_project.absolute_path,
-    )
-    .unwrap_or_else(|e| eprintln!("Failed to run jmeter: {e}"));
+    )?;
 
     let _ = remove_all_plugin_jars_symlinks();
 

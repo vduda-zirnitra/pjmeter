@@ -39,8 +39,7 @@ pub async fn exec(project: &Option<String>, environment: &Option<String>) -> Res
 
     load_plugins(&p_config.plugins).await?;
 
-    runner::design_with_jmeter(&p_config, &environment, &some_project.absolute_path)
-        .unwrap_or_else(|e| eprintln!("Failed to run jmeter: {e}"));
+    runner::design_with_jmeter(&p_config, &environment, &some_project.absolute_path)?;
 
     let _ = remove_all_plugin_jars_symlinks();
 

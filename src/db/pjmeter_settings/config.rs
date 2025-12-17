@@ -12,7 +12,10 @@ pub async fn init_db_pool() -> Result<()> {
     path::init_file(&conf_path)
         .map_err(|e| anyhow::anyhow!("Failed to create database file {}: {}", conf_path.display(), e))?;
 
-    let database_url = format!("sqlite://{}", conf_path.to_str().unwrap());
+    let database_url = format!("sqlite://{}", 
+        conf_path.to_str()
+            .ok_or_else(|| anyhow::anyhow!("Database path contains invalid UTF-8: {}", conf_path.display()))?
+    );
 
     // Run your database updates first
     update_database(&database_url).await?;
