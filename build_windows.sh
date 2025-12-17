@@ -58,11 +58,17 @@ mkdir -p "${PKG_DIR}/jmeter"
 mkdir -p "${PKG_DIR}/jmeter_plugins"
 
 # Copy binary
-install -m 0755 "${BIN_PATH}" "${PKG_DIR}/bin/${BINARY_NAME}.exe"
+cp "${BIN_PATH}" "${PKG_DIR}/bin/${BINARY_NAME}.exe"
+chmod 0755 "${PKG_DIR}/bin/${BINARY_NAME}.exe"
 
 # Optionally strip binary to reduce size
-if [[ "${STRIP_BINARIES}" == "1" ]] && command -v strip >/dev/null 2>&1; then
-  strip -s "${PKG_DIR}/bin/${BINARY_NAME}.exe" 2>/dev/null || true
+if [[ "${STRIP_BINARIES}" == "1" ]]; then
+  # Try cross-compiler strip first, then fallback to regular strip
+  if command -v "${RUST_BUILD_TARGET}-strip" >/dev/null 2>&1; then
+    "${RUST_BUILD_TARGET}-strip" "${PKG_DIR}/bin/${BINARY_NAME}.exe" 2>/dev/null || true
+  elif command -v strip >/dev/null 2>&1; then
+    strip "${PKG_DIR}/bin/${BINARY_NAME}.exe" 2>/dev/null || true
+  fi
 fi
 
 # Copy JMeter distribution
