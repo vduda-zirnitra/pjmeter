@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 use crate::db::pjmeter_settings;
 use crate::db::projects_settings;
 use crate::jmeter::plugins::remove_all_plugin_jars_symlinks;
+#[cfg(unix)]
 use crate::prerequisites::is_current_user_in_group;
 
 #[derive(Parser)]
@@ -94,14 +95,18 @@ async fn main() {
 }
 
 async fn run_app() -> Result<()> {
-    if !is_current_user_in_group("pjmeter")? {
-        eprintln!(
-            r#"The user running pjmeter doesn't belong to the pjmeter group.
+    // Group membership check is only applicable on Unix systems
+    #[cfg(unix)]
+    {
+        if !is_current_user_in_group("pjmeter")? {
+            eprintln!(
+                r#"The user running pjmeter doesn't belong to the pjmeter group.
 Please add the user to pjmeter group using "usermod -aG pjmeter <user_name>".
 
 To avoid reopening a session while just being added to the group, use "newgrp pjmeter".
 "#
-        );
+            );
+        }
     }
 
     let cli = Cli::parse();

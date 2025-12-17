@@ -11,11 +11,54 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[cfg(not(debug_assertions))]
-const JMETER_PATH: &str = "/opt/pjmeter/jmeter/bin/jmeter";
+fn get_jmeter_path() -> std::path::PathBuf {
+    let mut path = std::path::PathBuf::new();
 
-#[cfg(debug_assertions)]
-const JMETER_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/.sandbox/jmeter/bin/jmeter");
+    #[cfg(not(debug_assertions))]
+    {
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: Use Program Files or ProgramData
+            if let Ok(program_files) = std::env::var("PROGRAMFILES") {
+                path.push(program_files);
+            } else {
+                path.push("C:\\Program Files");
+            }
+            path.push("pjmeter");
+            path.push("jmeter");
+            path.push("bin");
+            path.push("jmeter.bat"); // Windows uses .bat script
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: Use /Applications or /Library
+            path.push("/Applications/pjmeter/jmeter/bin/jmeter");
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            // Linux and other Unix-like systems
+            path.push("/opt/pjmeter/jmeter/bin/jmeter");
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push(".sandbox");
+        path.push("jmeter");
+        path.push("bin");
+
+        #[cfg(target_os = "windows")]
+        path.push("jmeter.bat");
+
+        #[cfg(not(target_os = "windows"))]
+        path.push("jmeter");
+    }
+
+    path
+}
 
 pub fn design_with_jmeter(
     project_config: &ProjectConfig,
@@ -206,7 +249,7 @@ fn init_jmeter_command(
     environment: &str,
     project_dir: &str,
 ) -> Command {
-    let mut cmd = Command::new(JMETER_PATH);
+    let mut cmd = Command::new(get_jmeter_path());
     cmd.current_dir(format!("{project_dir}/jmeter/plans"));
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());

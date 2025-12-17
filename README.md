@@ -6,6 +6,7 @@ Packaged-JMeter allows developers to have unified JMeter directory structure in 
 
 ## Features
 - Command-line interface built in Rust
+- Cross-platform support (Linux, macOS, Windows)
 - User specific configuration
 - Each project has its own configuration and plugins
 - Design with variables configured in config.toml files
@@ -19,9 +20,14 @@ Packaged-JMeter allows developers to have unified JMeter directory structure in 
 - Install with : sudo dpkg -i "pjmeter_<version>-<debian_version>_<architecture>.deb"
  
 ### Runtime prerequisites
+
+#### Linux
 :warning: The user running pjmeter must belong to the group `pjmeter`. This is mandatory for plugin usage.
 
 The group is automatically created when installing with the .deb file, the user installing `pjmeter` is automatically added to this group but might need to restart its session to be properly recognized as belonging to the group.
+
+#### macOS / Windows
+No group membership requirements. The application uses platform-specific file permissions.
 
 ## Quickstart
 ### Summary
@@ -98,8 +104,18 @@ TARGET_ENV_PORT = "443"
 ```
 
 ## Data storage (SQLite)
-- User's data path: `~/.local/share/pjmeter/config.db` - specific to each user on the host machine, stores defined projects ;
-- Application's configuration : `/var/opt/pjmeter/config.db` - global to all users, stores JMeter plugins
+
+### Linux
+- User's data path: `~/.local/share/pjmeter/config.db` - specific to each user on the host machine, stores defined projects
+- Application's configuration: `/var/opt/pjmeter/config.db` - global to all users, stores JMeter plugins
+
+### macOS
+- User's data path: `~/Library/Application Support/pjmeter/config.db` - specific to each user on the host machine, stores defined projects
+- Application's configuration: `/Library/Application Support/pjmeter/config.db` - global to all users, stores JMeter plugins
+
+### Windows
+- User's data path: `%LOCALAPPDATA%\pjmeter\config.db` (e.g., `C:\Users\<username>\AppData\Local\pjmeter\config.db`) - specific to each user on the host machine, stores defined projects
+- Application's configuration: `%PROGRAMDATA%\pjmeter\config.db` (e.g., `C:\ProgramData\pjmeter\config.db`) - global to all users, stores JMeter plugins
 
 ## Logging
 - Logs to stdout and stderr
@@ -146,6 +162,15 @@ This project relies on JMeter to work properly, it is downloaded by given script
 **The downloaded JMeter must not be altered since it can't be commited and can't be shared by other developers.**
 
 **When packaging the application, the downloaded JMeter is also the one packaged, so no modifications can be made to it.**
+
+### JMeter Installation Paths (Production)
+The application expects JMeter to be installed in platform-specific locations:
+
+- **Linux**: `/opt/pjmeter/jmeter/`
+- **macOS**: `/Applications/pjmeter/jmeter/`
+- **Windows**: `C:\Program Files\pjmeter\jmeter\`
+
+For development builds, JMeter is expected in `.sandbox/jmeter/` relative to the project root.
 
 ## :information_source: Use cargo_db.sh instead of cargo
 This project is using sqlx to store configuration in SQLite database files. To compile, sqlx needs an existing database to check types on.
