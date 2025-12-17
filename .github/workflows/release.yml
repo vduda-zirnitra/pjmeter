@@ -25,78 +25,80 @@ jobs:
             platform: macos
             build_script: ./build_macos.sh
             artifact_pattern: build/macos/*.tar.gz
-    
+
     runs-on: ${{ matrix.os }}
-    
+
     permissions:
       contents: write
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Install system dependencies (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libssl-dev pkg-config dpkg-dev fakeroot curl unzip
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config dpkg-dev \
+            fakeroot curl unzip
 
-    - name: Install system dependencies (Windows cross-compile)
-      if: matrix.platform == 'windows'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libssl-dev pkg-config curl unzip zip mingw-w64
+      - name: Install system dependencies (Windows cross-compile)
+        if: matrix.platform == 'windows'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config curl unzip \
+            zip mingw-w64
 
-    - name: Install system dependencies (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        brew install pkg-config
+      - name: Install system dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          brew install pkg-config
 
-    - name: Setup Rust toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: stable
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
 
-    - name: Add Rust target (Windows)
-      if: matrix.platform == 'windows'
-      run: rustup target add x86_64-pc-windows-gnu
+      - name: Add Rust target (Windows)
+        if: matrix.platform == 'windows'
+        run: rustup target add x86_64-pc-windows-gnu
 
-    - name: Cache cargo tools
-      uses: actions/cache@v5
-      with:
-        path: ~/.cargo/bin/sqlx
-        key: ${{ runner.os }}-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-sqlx-
+      - name: Cache cargo tools
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: ${{ runner.os }}-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-sqlx-
 
-    - name: Install sqlx-cli
-      run: |
-        if ! command -v sqlx &> /dev/null; then
-          cargo install sqlx-cli --no-default-features --features sqlite
-        fi
+      - name: Install sqlx-cli
+        run: |
+          if ! command -v sqlx &> /dev/null; then
+            cargo install sqlx-cli --no-default-features --features sqlite
+          fi
 
-    - name: Build project
-      run: ./cargo_db.sh build --release
+      - name: Build project
+        run: ./cargo_db.sh build --release
 
-    - name: Run tests
-      run: ./cargo_db.sh test --release
+      - name: Run tests
+        run: ./cargo_db.sh test --release
 
-    - name: Build package
-      run: ${{ matrix.build_script }}
+      - name: Build package
+        run: ${{ matrix.build_script }}
 
-    - name: Find artifact
-      id: find_artifact
-      run: |
-        ARTIFACT_FILE=$(find ${{ matrix.artifact_pattern }} -type f | head -1)
-        echo "artifact_file=$ARTIFACT_FILE" >> $GITHUB_OUTPUT
-        echo "artifact_name=$(basename $ARTIFACT_FILE)" >> $GITHUB_OUTPUT
+      - name: Find artifact
+        id: find_artifact
+        run: |
+          ARTIFACT_FILE=$(find ${{ matrix.artifact_pattern }} -type f | head -1)
+          echo "artifact_file=$ARTIFACT_FILE" >> $GITHUB_OUTPUT
+          echo "artifact_name=$(basename $ARTIFACT_FILE)" >> $GITHUB_OUTPUT
 
-    - name: Upload artifact to release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: ${{ steps.find_artifact.outputs.artifact_file }}
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find_artifact.outputs.artifact_file }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
