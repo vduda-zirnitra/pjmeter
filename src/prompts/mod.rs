@@ -57,12 +57,7 @@ pub async fn prompt_project_selector() -> Result<String> {
 pub async fn prompt_environment_selector(project: &String) -> Result<String> {
     let p_config = get_project_config(project).await;
 
-    let environments: Vec<String> = p_config
-        .env
-        .custom_environments
-        .keys()
-        .cloned()
-        .collect();
+    let environments: Vec<String> = p_config.env.custom_environments.keys().cloned().collect();
     let term = Term::stdout();
     let idx = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Choose an environment")
@@ -76,14 +71,14 @@ pub async fn prompt_environment_selector(project: &String) -> Result<String> {
 
 pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
     let pool = projects_settings::config::db_pool();
-    let project_absolute_path =
-        match projects_settings::settings::get_project(pool, project).await {
-            Ok(Some(project)) => project.absolute_path,
-            _ => {
-                eprintln!("Failed to get project {project} from database");
-                exit(1);
-            }
-        };
+    let project_absolute_path = match projects_settings::settings::get_project(pool, project).await
+    {
+        Ok(Some(project)) => project.absolute_path,
+        _ => {
+            eprintln!("Failed to get project {project} from database");
+            exit(1);
+        }
+    };
 
     let plans = path::list_plan_files(format!("{project_absolute_path}/jmeter/plans").as_str());
 

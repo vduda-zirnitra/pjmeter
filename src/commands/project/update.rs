@@ -53,8 +53,7 @@ pub async fn exec(
                 }
             }
 
-            match projects_settings::settings::update_project(pool, &label, updated_project).await
-            {
+            match projects_settings::settings::update_project(pool, &label, updated_project).await {
                 Ok(_) => println!("Updated project successfully."),
                 Err(e) => eprintln!("An error occurred when updating the project {e}"),
             }
