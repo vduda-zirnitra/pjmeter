@@ -2,7 +2,6 @@ use crate::db::projects_settings;
 use crate::io;
 use crate::prompts;
 use std::path::Path;
-use std::process::exit;
 
 pub async fn exec(
     label: Option<&String>,
@@ -16,7 +15,7 @@ pub async fn exec(
 
     let new_name = Some(match new_name {
         Some(new_name) => new_name.clone(),
-        None => prompts::get_project_label_from_prompt().await,
+        None => prompts::get_project_label_from_prompt().await?,
     });
 
     let path = Some(match path {
@@ -25,8 +24,7 @@ pub async fn exec(
     });
 
     if new_name.is_none() && path.is_none() {
-        eprintln!("A new name has and/or a new path need to be provided to update the project");
-        exit(0);
+        return Err(anyhow::anyhow!("A new name and/or a new path need to be provided to update the project"));
     }
 
     let pool = projects_settings::config::db_pool();
@@ -40,16 +38,12 @@ pub async fn exec(
             }
             if let Some(new_path) = &path {
                 let normalised_path = io::path::validate_and_normalize_path(new_path)
-                    .unwrap_or_else(|e| {
-                        eprintln!("{}", e);
-                        exit(1)
-                    });
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
 
                 if Path::new(&normalised_path).exists() {
                     updated_project.absolute_path = normalised_path;
                 } else {
-                    eprintln!("New path doesn't exist: {normalised_path}");
-                    exit(1)
+                    return Err(anyhow::anyhow!("New path doesn't exist: {}", normalised_path));
                 }
             }
 

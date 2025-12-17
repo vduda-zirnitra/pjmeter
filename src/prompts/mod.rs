@@ -6,7 +6,6 @@ use console::Term;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
 use std::path::Path;
-use std::process::exit;
 
 pub async fn prompt_display_main_menu(actions: &[&str]) -> Result<usize> {
     let term = Term::stdout();
@@ -34,13 +33,9 @@ pub async fn prompt_project_menu(commands: &[&str]) -> Result<usize> {
 
 pub async fn prompt_project_selector() -> Result<String> {
     let pool = projects_settings::config::db_pool();
-    let projects = match projects_settings::settings::get_all_projects(pool).await {
-        Ok(projects) => projects,
-        _ => {
-            eprintln!("Failed to get projects from database");
-            exit(1);
-        }
-    };
+    let projects = projects_settings::settings::get_all_projects(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get projects from database: {}", e))?;
 
     let projects: Vec<String> = projects.iter().map(|p| p.label.clone()).collect();
     let term = Term::stdout();
@@ -55,7 +50,7 @@ pub async fn prompt_project_selector() -> Result<String> {
 }
 
 pub async fn prompt_environment_selector(project: &String) -> Result<String> {
-    let p_config = get_project_config(project).await;
+    let p_config = get_project_config(project).await?;
 
     let environments: Vec<String> = p_config.env.custom_environments.keys().cloned().collect();
     let term = Term::stdout();
@@ -71,14 +66,10 @@ pub async fn prompt_environment_selector(project: &String) -> Result<String> {
 
 pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
     let pool = projects_settings::config::db_pool();
-    let project_absolute_path = match projects_settings::settings::get_project(pool, project).await
-    {
-        Ok(Some(project)) => project.absolute_path,
-        _ => {
-            eprintln!("Failed to get project {project} from database");
-            exit(1);
-        }
-    };
+    let project_absolute_path = projects_settings::settings::get_project(pool, project)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Failed to get project {} from database", project))?
+        .absolute_path;
 
     let plans = path::list_plan_files(format!("{project_absolute_path}/jmeter/plans").as_str());
 
@@ -97,19 +88,14 @@ pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
     Ok(selected_plans)
 }
 
-async fn get_project_config(project: &String) -> ProjectConfig {
+async fn get_project_config(project: &String) -> Result<ProjectConfig> {
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(pool, project).await {
-        Ok(Some(some_project)) => ProjectConfig::open(Path::new(&some_project.absolute_path))
-            .unwrap_or_else(|e| {
-                eprintln!("{e}");
-                exit(1)
-            }),
-        _ => {
-            eprintln!("Failed to get project {project} from database");
-            exit(1);
-        }
-    }
+    let some_project = projects_settings::settings::get_project(pool, project)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Failed to get project {} from database", project))?;
+    
+    ProjectConfig::open(Path::new(&some_project.absolute_path))
+        .map_err(|e| anyhow::anyhow!("Failed to open project config: {}", e))
 }
 
 pub fn prompt_for_input(prompt: &str) -> Result<String> {
@@ -122,7 +108,7 @@ pub fn prompt_for_input(prompt: &str) -> Result<String> {
     Ok(input)
 }
 
-pub async fn get_project_label_from_prompt() -> String {
+pub async fn get_project_label_from_prompt() -> Result<String> {
     let pool = projects_settings::config::db_pool();
     loop {
         match prompt_for_input("Project's label") {
@@ -136,11 +122,8 @@ pub async fn get_project_label_from_prompt() -> String {
                         "A project with the label {label} already exists and points to {}",
                         some_project.absolute_path
                     ),
-                    Ok(None) => return label,
-                    Err(e) => {
-                        eprintln!("Failed to read database {e}");
-                        exit(1);
-                    }
+                    Ok(None) => return Ok(label),
+                    Err(e) => return Err(anyhow::anyhow!("Failed to read database: {}", e)),
                 }
             }
             _ => continue,

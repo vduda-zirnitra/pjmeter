@@ -85,17 +85,17 @@ pub fn init_file(conf_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn panic_if_not_exists(path: &Path) {
+pub fn check_path_exists(path: &Path) -> Result<()> {
     if !path.exists() {
-        panic!("{} does not exist", path.to_str().unwrap());
+        return Err(anyhow::anyhow!("{} does not exist", path.display()));
     }
+    Ok(())
 }
 
-pub fn init_app_config_dir(path: &Path, error: &str) {
-    match fs::create_dir_all(path) {
-        Ok(_) => (),
-        Err(e) => panic!("{error} {}: {}", path.to_str().unwrap(), e),
-    }
+pub fn init_app_config_dir(path: &Path, error: &str) -> Result<()> {
+    fs::create_dir_all(path)
+        .map_err(|e| anyhow::anyhow!("{error} {}: {}", path.display(), e))?;
+    Ok(())
 }
 
 #[cfg(test)]

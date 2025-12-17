@@ -86,7 +86,14 @@ enum ProjectCommands {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    if let Err(e) = run_app().await {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run_app() -> Result<()> {
     if !is_current_user_in_group("pjmeter")? {
         eprintln!(
             r#"The user running pjmeter doesn't belong to the pjmeter group.
@@ -110,7 +117,7 @@ To avoid reopening a session while just being added to the group, use "newgrp pj
                 1 => commands::run::exec(&None, &None, &None).await?,
                 2 => handle_project_option().await?,
                 3 => commands::healthcheck::exec().await?,
-                _ => std::process::exit(0),
+                _ => return Ok(()), // User cancelled or selected exit
             };
         }
         Some(Commands::Design {
@@ -160,7 +167,7 @@ async fn handle_project_option() -> Result<()> {
         1 => commands::project::update::exec(None, &None, &None).await?,
         2 => commands::project::list::exec().await?,
         3 => commands::project::remove::exec(None).await?,
-        _ => std::process::exit(0),
+        _ => return Ok(()), // User cancelled or selected exit
     }
 
     Ok(())
