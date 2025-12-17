@@ -1,17 +1,17 @@
-mod db;
-mod models;
-mod project_config;
 mod commands;
+mod db;
 mod io;
 mod jmeter;
+mod models;
 mod prerequisites;
+mod project_config;
 mod prompts;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::db::projects_settings;
 use crate::db::pjmeter_settings;
+use crate::db::projects_settings;
 use crate::jmeter::plugins::remove_all_plugin_jars_symlinks;
 use crate::prerequisites::is_current_user_in_group;
 
@@ -89,11 +89,12 @@ enum ProjectCommands {
 async fn main() -> Result<()> {
     if !is_current_user_in_group("pjmeter")? {
         eprintln!(
-r#"The user running pjmeter doesn't belong to the pjmeter group.
+            r#"The user running pjmeter doesn't belong to the pjmeter group.
 Please add the user to pjmeter group using "usermod -aG pjmeter <user_name>".
 
 To avoid reopening a session while just being added to the group, use "newgrp pjmeter".
-"#);
+"#
+        );
     }
 
     let cli = Cli::parse();
@@ -103,39 +104,45 @@ To avoid reopening a session while just being added to the group, use "newgrp pj
 
     match &cli.command {
         None => {
-            let actions = &[
-                "Design",
-                "Run",
-                "Project",
-                "Health Check",
-            ];
-            match prompts::prompts::prompt_display_main_menu(actions).await? {
+            let actions = &["Design", "Run", "Project", "Health Check"];
+            match prompts::prompt_display_main_menu(actions).await? {
                 0 => commands::design::exec(&None, &None).await?,
                 1 => commands::run::exec(&None, &None, &None).await?,
                 2 => handle_project_option().await?,
                 3 => commands::healthcheck::exec().await?,
-                _ => std::process::exit(0)
+                _ => std::process::exit(0),
             };
-        },
-        Some(Commands::Design { project, environment }) => {
+        }
+        Some(Commands::Design {
+            project,
+            environment,
+        }) => {
             commands::design::exec(project, environment).await?;
         }
-        Some(Commands::Run { project, environment, plans }) => {
+        Some(Commands::Run {
+            project,
+            environment,
+            plans,
+        }) => {
             commands::run::exec(project, environment, plans).await?;
         }
-        Some(Commands::Project(subcmd))=> match subcmd {
+        Some(Commands::Project(subcmd)) => match subcmd {
             ProjectCommands::Add { label, path } => {
                 commands::project::add::exec(Some(label), Some(path)).await?;
-            },
-            ProjectCommands::Update { label, new_label: new_name, path } => {
+            }
+            ProjectCommands::Update {
+                label,
+                new_label: new_name,
+                path,
+            } => {
                 commands::project::update::exec(Some(label), new_name, path).await?;
-            },
+            }
             ProjectCommands::List => {
                 commands::project::list::exec().await?;
             }
             ProjectCommands::Remove { label } => {
                 commands::project::remove::exec(Some(label)).await?;
-            },
+            }
         },
         Some(Commands::HealthCheck) => {
             commands::healthcheck::exec().await?;
@@ -146,19 +153,14 @@ To avoid reopening a session while just being added to the group, use "newgrp pj
 }
 
 async fn handle_project_option() -> Result<()> {
-    let project_commands = &[
-        "Add",
-        "Update",
-        "List",
-        "Remove",
-    ];
+    let project_commands = &["Add", "Update", "List", "Remove"];
 
-    match prompts::prompts::prompt_project_menu(project_commands).await? {
+    match prompts::prompt_project_menu(project_commands).await? {
         0 => commands::project::add::exec(None, None).await?,
         1 => commands::project::update::exec(None, &None, &None).await?,
         2 => commands::project::list::exec().await?,
         3 => commands::project::remove::exec(None).await?,
-        _ => std::process::exit(0)
+        _ => std::process::exit(0),
     }
 
     Ok(())

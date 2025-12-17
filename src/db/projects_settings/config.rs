@@ -1,20 +1,25 @@
-use sqlx::{migrate, sqlite::SqlitePoolOptions, Connection, SqliteConnection, SqlitePool, Error};
-use std::path::PathBuf;
-use std::time::Duration;
-use std::sync::OnceLock;
-use anyhow::Result;
 use crate::io::path;
+use anyhow::Result;
+use sqlx::{Connection, Error, SqliteConnection, SqlitePool, migrate, sqlite::SqlitePoolOptions};
+use std::path::PathBuf;
+use std::sync::OnceLock;
+use std::time::Duration;
 
 static DB_POOL: OnceLock<SqlitePool> = OnceLock::new();
 
 pub async fn init_db_pool() -> Result<()> {
     let conf_path = get_conf_path();
-    path::init_file(&conf_path).expect(format!("Failed to create database file {}", conf_path.to_str().unwrap()).as_str());
+    path::init_file(&conf_path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to create database file {}",
+            conf_path.to_str().unwrap()
+        )
+    });
 
     let database_url = format!("sqlite://{}", conf_path.to_str().unwrap());
 
     // Run your database updates first
-    update_database(&database_url).await;
+    update_database(&database_url).await?;
 
     // Create the pool
     let pool = SqlitePoolOptions::new()
@@ -22,17 +27,23 @@ pub async fn init_db_pool() -> Result<()> {
         .acquire_timeout(Duration::from_secs(5))
         .connect(&database_url)
         .await
-        .expect(format!("Could not connect to the database, check if {} exists and its read/write permissions.", conf_path.display()).as_str());
+        .unwrap_or_else(|_| {
+            panic!(
+                "Could not connect to the database, check if {} exists and its read/write permissions.",
+                conf_path.display()
+            )
+        });
 
     // Store it in the OnceLock
-    DB_POOL.set(pool)
-        .map_err(|_| Error::PoolClosed)?;
+    DB_POOL.set(pool).map_err(|_| Error::PoolClosed)?;
 
     Ok(())
 }
 
 pub fn db_pool() -> &'static SqlitePool {
-    DB_POOL.get().expect("Database pool not initialized. Call init_db_pool() first.")
+    DB_POOL
+        .get()
+        .expect("Database pool not initialized. Call init_db_pool() first.")
 }
 
 fn get_conf_path() -> PathBuf {
@@ -55,19 +66,20 @@ fn get_conf_path() -> PathBuf {
 }
 
 fn get_home_dir() -> PathBuf {
-    let path = match dirs::home_dir() {
+    match dirs::home_dir() {
         Some(path) => path,
         None => panic!("Could not find home directory"),
-    };
-
-    path
+    }
 }
 
-async fn update_database(database_url: &str) {
-    let mut conn = SqliteConnection::connect(database_url).await.unwrap();
-
-    match migrate!("./migrations/projects_settings").run(&mut conn).await {
-        Ok(_) => (),
-        Err(e) => panic!("Database update failed: {}", e),
-    };
+async fn update_database(database_url: &str) -> Result<()> {
+    let mut conn = SqliteConnection::connect(database_url).await?;
+    migrate!("./migrations/projects_settings")
+        .run(&mut conn)
+        .await
+        .map_err(|e| {
+            eprintln!("Database update failed: {}", e);
+            anyhow::anyhow!("Database update failed: {}", e)
+        })?;
+    Ok(())
 }

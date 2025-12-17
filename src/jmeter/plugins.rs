@@ -1,22 +1,22 @@
+use crate::db::pjmeter_settings;
 use crate::project_config::PluginsConfig;
 use crate::{io, models};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use console::style;
+use futures_util::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::ErrorKind;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use users::get_group_by_name;
-use std::os::unix::fs::symlink;
 use std::time::Duration;
-use console::style;
-use indicatif::{ProgressBar, ProgressStyle};
-use tokio::time::sleep;
 use tokio::io::AsyncWriteExt;
-use futures_util::StreamExt;
-use crate::db::pjmeter_settings;
+use tokio::time::sleep;
+use users::get_group_by_name;
 
 const JMETER_PLUGIN_PACKAGES: &str = "https://jmeter-plugins.org/files/packages/";
 #[cfg(not(debug_assertions))]
@@ -50,7 +50,9 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
     for (name, version) in plugins.plugin_map.iter() {
         match check_if_plugin_is_downloaded(name, version).await {
             Ok(available_plugin) => available_plugins.push(available_plugin),
-            Err(_) => { missing_plugins.insert(name.clone(), version.clone()); }
+            Err(_) => {
+                missing_plugins.insert(name.clone(), version.clone());
+            }
         }
     }
 
@@ -68,7 +70,8 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
                 "pjmeter",
                 current_plugin,
                 total_to_download,
-            ).await?;
+            )
+            .await?;
 
             available_plugins.push(new_plugin);
             current_plugin += 1;
@@ -85,7 +88,7 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
             let link_path = jmeter_plugin_path.join(jar);
             match create_plugin_jar_symlink(link_path.as_path(), target_path.as_path()) {
                 Ok(_) => {}
-                Err(e) => { return Err(anyhow!("Failed to create symlink: {e}")) }
+                Err(e) => return Err(anyhow!("Failed to create symlink: {e}")),
             }
         }
     }
@@ -105,7 +108,11 @@ fn create_plugin_jar_symlink(link: impl AsRef<Path>, target: impl AsRef<Path>) -
     match symlink(target, link) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == ErrorKind::AlreadyExists => Ok(()),
-        Err(e) => Err(anyhow!("Unable to create a link to jar file. Target : {}. Link : {} {e}", target.display(), link.display())),
+        Err(e) => Err(anyhow!(
+            "Unable to create a link to jar file. Target : {}. Link : {} {e}",
+            target.display(),
+            link.display()
+        )),
     }
 }
 
@@ -136,8 +143,16 @@ pub fn remove_all_plugin_jars_symlinks() -> Result<u64> {
     Ok(removed)
 }
 
-async fn check_if_plugin_is_downloaded(plugin_name: &str, plugin_version: &str) -> Result<models::plugin::Plugin> {
-    Ok(pjmeter_settings::settings::get_plugin(pjmeter_settings::config::db_pool(), plugin_name, plugin_version).await?)
+async fn check_if_plugin_is_downloaded(
+    plugin_name: &str,
+    plugin_version: &str,
+) -> Result<models::plugin::Plugin> {
+    Ok(pjmeter_settings::settings::get_plugin(
+        pjmeter_settings::config::db_pool(),
+        plugin_name,
+        plugin_version,
+    )
+    .await?)
 }
 
 /// Lists all available plugins
@@ -161,7 +176,10 @@ async fn download_and_register_plugin(
 ) -> Result<models::plugin::Plugin> {
     // Check availability first
     let Some(plugin) = find_plugin(downloadable_plugin_list, plugin_name, plugin_version) else {
-        println!("  [{current_plugin_number}/{total_to_download}] Plugin {plugin_name}-{plugin_version} : {}", style("NOT FOUND").red().bold());
+        println!(
+            "  [{current_plugin_number}/{total_to_download}] Plugin {plugin_name}-{plugin_version} : {}",
+            style("NOT FOUND").red().bold()
+        );
         return Err(anyhow!(
             "Plugin {} (version {:?}) not found",
             plugin_name,
@@ -176,7 +194,8 @@ async fn download_and_register_plugin(
         ProgressStyle::with_template(
             "{spinner:.green} {msg} [{bar:40.cyan/blue}] {percent:>3}% \
              {bytes}/{total_bytes}",
-        )?.progress_chars("#>-"),
+        )?
+        .progress_chars("#>-"),
     );
     pb.enable_steady_tick(Duration::from_millis(80));
 
@@ -232,9 +251,9 @@ async fn download_and_register_plugin(
 
     // Switch to a spinner for subsequent stages
     let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::with_template("{spinner:.green} {msg} : {prefix} ({elapsed_precise})")?
-    );
+    spinner.set_style(ProgressStyle::with_template(
+        "{spinner:.green} {msg} : {prefix} ({elapsed_precise})",
+    )?);
     spinner.enable_steady_tick(Duration::from_millis(80));
 
     spinner.set_message(format!("Plugin {plugin_name}-{plugin_version}"));
@@ -260,12 +279,17 @@ async fn download_and_register_plugin(
     }
 
     let pool = pjmeter_settings::config::db_pool();
-    pjmeter_settings::settings::add_plugin(pool, plugin_name, plugin_version, jar_file_names).await?;
-    let plugin_row = pjmeter_settings::settings::get_plugin(pool, plugin_name, plugin_version).await?;
+    pjmeter_settings::settings::add_plugin(pool, plugin_name, plugin_version, jar_file_names)
+        .await?;
+    let plugin_row =
+        pjmeter_settings::settings::get_plugin(pool, plugin_name, plugin_version).await?;
 
     // Done
     spinner.finish_and_clear();
-    println!("  [{current_plugin_number}/{total_to_download}] Plugin {plugin_name}-{plugin_version} : {}", format!("{}", style("OK").green().bold()));
+    println!(
+        "  [{current_plugin_number}/{total_to_download}] Plugin {plugin_name}-{plugin_version} : {}",
+        style("OK").green().bold()
+    );
 
     Ok(plugin_row)
 }
@@ -279,8 +303,8 @@ fn find_plugin<'a>(
 ) -> Option<&'a PluginInfo> {
     plugins.iter().find(|plugin| {
         plugin.file.starts_with(plugin_name)
-        && plugin.file.contains(plugin_version)
-        && plugin.file.ends_with(".zip")
+            && plugin.file.contains(plugin_version)
+            && plugin.file.ends_with(".zip")
     })
 }
 
@@ -329,7 +353,7 @@ fn extract_jar_from_zip(zip_path: &Path, dest_dir: &Path) -> Result<Vec<PathBuf>
             None => continue,
         };
 
-        if enclosed.extension().map_or(false, |e| e == "jar") {
+        if enclosed.extension().is_some_and(|e| e == "jar") {
             let file_name = match enclosed.file_name() {
                 Some(f) => f,
                 None => continue,
@@ -350,15 +374,18 @@ fn extract_jar_from_zip(zip_path: &Path, dest_dir: &Path) -> Result<Vec<PathBuf>
     }
 
     if extracted.is_empty() {
-        Err(anyhow!("No .jar file to extract from {}", zip_path.display()))
+        Err(anyhow!(
+            "No .jar file to extract from {}",
+            zip_path.display()
+        ))
     } else {
         Ok(extracted)
     }
 }
 
 fn change_group(path: &Path, group_name: &str) -> Result<()> {
-    let _ = get_group_by_name(group_name)
-        .ok_or_else(|| anyhow!("Group {} not found", group_name))?;
+    let _ =
+        get_group_by_name(group_name).ok_or_else(|| anyhow!("Group {} not found", group_name))?;
     let path_str = path.to_str().ok_or(anyhow!("Invalid jar file path"))?;
     let status = Command::new("chown")
         .arg(format!(":{}", group_name))
@@ -366,7 +393,7 @@ fn change_group(path: &Path, group_name: &str) -> Result<()> {
         .status();
     match status {
         Ok(s) if s.success() => Ok(()),
-        _ => Err(anyhow!("Unable to change plugin's group (missing rights)"))
+        _ => Err(anyhow!("Unable to change plugin's group (missing rights)")),
     }
 }
 
@@ -380,8 +407,14 @@ mod tests {
     // Helper: mock plugin list
     fn mock_plugin_list() -> Vec<PluginInfo> {
         vec![
-            PluginInfo { file: "jpgc-cmdrunner-2.3.zip".to_string(), size: 13_000_155 },
-            PluginInfo { file: "jpgc-udf-0.6.zip".to_string(), size: 153_025 },
+            PluginInfo {
+                file: "jpgc-cmdrunner-2.3.zip".to_string(),
+                size: 13_000_155,
+            },
+            PluginInfo {
+                file: "jpgc-udf-0.6.zip".to_string(),
+                size: 153_025,
+            },
         ]
     }
 
@@ -423,7 +456,7 @@ mod tests {
             let content = fs::read_to_string(&extracted).unwrap();
             assert_eq!(content, "dummy jar content");
         }
-}
+    }
 
     #[test]
     fn test_extract_jar_from_zip_with_no_jar() {
@@ -472,5 +505,4 @@ mod tests {
         );
         assert!(result.await.is_err());
     }
-
 }

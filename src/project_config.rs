@@ -24,7 +24,8 @@ pub struct PluginsConfig {
 #[derive(Deserialize, Debug)]
 pub struct EnvConfig {
     #[serde(flatten)]
-    pub custom_environments: std::collections::HashMap<String, std::collections::HashMap<String, toml::Value>>,
+    pub custom_environments:
+        std::collections::HashMap<String, std::collections::HashMap<String, toml::Value>>,
 }
 
 impl ProjectConfig {
@@ -32,11 +33,21 @@ impl ProjectConfig {
         let mut config_file_path = PathBuf::from(path);
         config_file_path.push("jmeter/config.toml");
 
-        let config_str = std::fs::read_to_string(&config_file_path)
-            .map_err(|err| format!("Could not read config file at {}: {}", config_file_path.display(), err))?;
+        let config_str = std::fs::read_to_string(&config_file_path).map_err(|err| {
+            format!(
+                "Could not read config file at {}: {}",
+                config_file_path.display(),
+                err
+            )
+        })?;
 
-        let project_config = toml::from_str(&config_str)
-            .map_err(|err| format!("Could not parse config file at {}: {}", config_file_path.display(), err))?;
+        let project_config = toml::from_str(&config_str).map_err(|err| {
+            format!(
+                "Could not parse config file at {}: {}",
+                config_file_path.display(),
+                err
+            )
+        })?;
 
         Ok(project_config)
     }
@@ -70,8 +81,14 @@ PORT = "8080"
 
         let config = ProjectConfig::open(tmp.path()).unwrap();
         assert_eq!(config.jmeter.inactivity_kill_timeout, Some(60));
-        assert_eq!(config.jmeter.default_test_plan, Some("test.jmx".to_string()));
-        assert_eq!(config.plugins.plugin_map.get("jpgc-dummy"), Some(&"0.4".to_string()));
+        assert_eq!(
+            config.jmeter.default_test_plan,
+            Some("test.jmx".to_string())
+        );
+        assert_eq!(
+            config.plugins.plugin_map.get("jpgc-dummy"),
+            Some(&"0.4".to_string())
+        );
         assert!(config.env.custom_environments.contains_key("dev"));
     }
 

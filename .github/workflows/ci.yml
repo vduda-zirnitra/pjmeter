@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config
+
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Cache cargo tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/sqlx
+        key: ${{ runner.os }}-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-sqlx-
+
+    - name: Install sqlx-cli
+      run: |
+        if ! command -v sqlx &> /dev/null; then
+          cargo install sqlx-cli --no-default-features --features sqlite
+        fi
+
+    - name: Test database migrations
+      run: |
+        # Create test databases and run migrations
+        mkdir -p target/sqlx
+        
+        # Test pjmeter_settings migrations
+        DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_pjmeter.db"
+        sqlx database create --database-url "$DATABASE_URL"
+        sqlx migrate run --source migrations/pjmeter_settings --database-url "$DATABASE_URL"
+        
+        # Test projects_settings migrations
+        DATABASE_URL="sqlite:///$(pwd)/target/sqlx/test_projects.db"
+        sqlx database create --database-url "$DATABASE_URL"
+        sqlx migrate run --source migrations/projects_settings --database-url "$DATABASE_URL"
+
+    - name: Build project
+      run: ./cargo_db.sh build
+
+    - name: Run tests
+      run: ./cargo_db.sh test
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      run: |
+        # Set up database for clippy (sqlx needs it for compile-time checks)
+        export DATABASE_URL="sqlite:///$(pwd)/target/sqlx/build-check.db"
+        if [ ! -f "$(pwd)/target/sqlx/build-check.db" ]; then
+          # If build database doesn't exist, create a fresh one
+          mkdir -p target/sqlx
+          sqlx database create --database-url "$DATABASE_URL"
+          sqlx migrate run --source migrations/pjmeter_settings --database-url "$DATABASE_URL"
+          sqlx migrate run --source migrations/projects_settings --database-url "$DATABASE_URL"
+        fi
+        cargo clippy --all-targets -- -D warnings

@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config dpkg-dev fakeroot curl unzip
+
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Cache cargo tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/sqlx
+        key: ${{ runner.os }}-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-sqlx-
+
+    - name: Install sqlx-cli
+      run: |
+        if ! command -v sqlx &> /dev/null; then
+          cargo install sqlx-cli --no-default-features --features sqlite
+        fi
+
+    - name: Build project
+      run: ./cargo_db.sh build --release
+
+    - name: Run tests
+      run: ./cargo_db.sh test --release
+
+    - name: Build Debian package
+      run: ./build_debian.sh
+
+    - name: Find .deb file
+      id: find_deb
+      run: |
+        DEB_FILE=$(find build/deb -name "*.deb" -type f)
+        echo "deb_file=$DEB_FILE" >> $GITHUB_OUTPUT
+        echo "deb_name=$(basename $DEB_FILE)" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ steps.find_deb.outputs.deb_file }}
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

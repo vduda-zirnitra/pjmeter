@@ -1,10 +1,14 @@
+use crate::db::projects_settings;
+use crate::io;
+use crate::prompts;
 use std::path::Path;
 use std::process::exit;
-use crate::io;
-use crate::db::projects_settings;
-use crate::prompts::prompts;
 
-pub async fn exec(label: Option<&String>, new_name: &Option<String>, path: &Option<String>) -> anyhow::Result<()> {
+pub async fn exec(
+    label: Option<&String>,
+    new_name: &Option<String>,
+    path: &Option<String>,
+) -> anyhow::Result<()> {
     let label = match label {
         Some(label) => label.clone(),
         None => prompts::prompt_project_selector().await?,
@@ -26,7 +30,10 @@ pub async fn exec(label: Option<&String>, new_name: &Option<String>, path: &Opti
     }
 
     let pool = projects_settings::config::db_pool();
-    match projects_settings::settings::get_project(&pool, &label).await?.as_mut() {
+    match projects_settings::settings::get_project(pool, &label)
+        .await?
+        .as_mut()
+    {
         Some(updated_project) => {
             if let Some(new_label) = &new_name {
                 updated_project.label = new_label.clone();
@@ -46,7 +53,7 @@ pub async fn exec(label: Option<&String>, new_name: &Option<String>, path: &Opti
                 }
             }
 
-            match projects_settings::settings::update_project(&pool, &label, updated_project).await {
+            match projects_settings::settings::update_project(pool, &label, updated_project).await {
                 Ok(_) => println!("Updated project successfully."),
                 Err(e) => eprintln!("An error occurred when updating the project {e}"),
             }
