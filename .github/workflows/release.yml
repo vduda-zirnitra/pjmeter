@@ -10,7 +10,23 @@ env:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            build_script: ./build_debian.sh
+            artifact_pattern: build/deb/*.deb
+          - os: ubuntu-latest
+            platform: windows
+            build_script: ./build_windows.sh
+            artifact_pattern: build/windows/*.zip
+          - os: macos-latest
+            platform: macos
+            build_script: ./build_macos.sh
+            artifact_pattern: build/macos/*.tar.gz
+    
+    runs-on: ${{ matrix.os }}
     
     permissions:
       contents: write
@@ -19,15 +35,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Install system dependencies
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y libssl-dev pkg-config dpkg-dev fakeroot curl unzip
+
+    - name: Install system dependencies (Windows cross-compile)
+      if: matrix.platform == 'windows'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config curl unzip zip mingw-w64
+
+    - name: Install system dependencies (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        brew install pkg-config
 
     - name: Setup Rust toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         toolchain: stable
+
+    - name: Add Rust target (Windows)
+      if: matrix.platform == 'windows'
+      run: rustup target add x86_64-pc-windows-gnu
 
     - name: Cache cargo tools
       uses: actions/cache@v5
@@ -49,20 +81,20 @@ jobs:
     - name: Run tests
       run: ./cargo_db.sh test --release
 
-    - name: Build Debian package
-      run: ./build_debian.sh
+    - name: Build package
+      run: ${{ matrix.build_script }}
 
-    - name: Find .deb file
-      id: find_deb
+    - name: Find artifact
+      id: find_artifact
       run: |
-        DEB_FILE=$(find build/deb -name "*.deb" -type f)
-        echo "deb_file=$DEB_FILE" >> $GITHUB_OUTPUT
-        echo "deb_name=$(basename $DEB_FILE)" >> $GITHUB_OUTPUT
+        ARTIFACT_FILE=$(find ${{ matrix.artifact_pattern }} -type f | head -1)
+        echo "artifact_file=$ARTIFACT_FILE" >> $GITHUB_OUTPUT
+        echo "artifact_name=$(basename $ARTIFACT_FILE)" >> $GITHUB_OUTPUT
 
-    - name: Create Release
+    - name: Upload artifact to release
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.find_deb.outputs.deb_file }}
+        files: ${{ steps.find_artifact.outputs.artifact_file }}
         generate_release_notes: true
         draft: false
         prerelease: false
