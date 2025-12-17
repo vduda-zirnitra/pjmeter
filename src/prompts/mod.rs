@@ -1,7 +1,7 @@
 use crate::db::projects_settings;
 use crate::io::path;
 use crate::project_config::ProjectConfig;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::Term;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
@@ -35,7 +35,7 @@ pub async fn prompt_project_selector() -> Result<String> {
     let pool = projects_settings::config::db_pool();
     let projects = projects_settings::settings::get_all_projects(pool)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to get projects from database: {}", e))?;
+        .context("Failed to get projects from database")?;
 
     let projects: Vec<String> = projects.iter().map(|p| p.label.clone()).collect();
     let term = Term::stdout();
@@ -68,7 +68,7 @@ pub async fn prompt_project_plans(project: &String) -> Result<Vec<String>> {
     let pool = projects_settings::config::db_pool();
     let project_absolute_path = projects_settings::settings::get_project(pool, project)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Failed to get project {} from database", project))?
+        .ok_or_else(|| anyhow::anyhow!("Project '{}' not found in database", project))?
         .absolute_path;
 
     let plans = path::list_plan_files(format!("{project_absolute_path}/jmeter/plans").as_str());
@@ -92,10 +92,10 @@ async fn get_project_config(project: &String) -> Result<ProjectConfig> {
     let pool = projects_settings::config::db_pool();
     let some_project = projects_settings::settings::get_project(pool, project)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Failed to get project {} from database", project))?;
+        .ok_or_else(|| anyhow::anyhow!("Project '{}' not found in database", project))?;
     
     ProjectConfig::open(Path::new(&some_project.absolute_path))
-        .map_err(|e| anyhow::anyhow!("Failed to open project config: {}", e))
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
 pub fn prompt_for_input(prompt: &str) -> Result<String> {
@@ -123,7 +123,7 @@ pub async fn get_project_label_from_prompt() -> Result<String> {
                         some_project.absolute_path
                     ),
                     Ok(None) => return Ok(label),
-                    Err(e) => return Err(anyhow::anyhow!("Failed to read database: {}", e)),
+                    Err(e) => return Err(e).context("Failed to read database"),
                 }
             }
             _ => continue,
