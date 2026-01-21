@@ -10,7 +10,7 @@ description = "A helping tool to execute JMeter test plans on any project"
 tokio = { version = "1.47.1", features = ["full"] }
 clap = { version = "4.5.45", features = ["derive", "cargo"] }
 anyhow = "1.0.99"
-chrono = "0.4.41"
+chrono = "0.4.43"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
 dirs = "6.0.0"
 toml = "0.9.5"
