@@ -135,8 +135,7 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
         println!("Retrieving missing plugins:");
         let downloadable_plugin_list = fetch_downloadable_plugin_list().await?;
         let total_to_download = missing_plugins.len();
-        let mut current_plugin = 1;
-        for plugin in missing_plugins.iter() {
+        for (current_plugin, plugin) in (1..).zip(missing_plugins.iter()) {
             let new_plugin = download_and_register_plugin(
                 plugin.0,
                 plugin.1,
@@ -149,7 +148,6 @@ pub async fn load_plugins(plugins: &PluginsConfig) -> Result<()> {
             .await?;
 
             available_plugins.push(new_plugin);
-            current_plugin += 1;
         }
 
         println!();

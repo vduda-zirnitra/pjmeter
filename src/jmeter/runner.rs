@@ -151,7 +151,7 @@ pub fn run_with_jmeter(
                 if inactivity_rx.try_recv().is_ok() {
                     eprintln!(
                         "No activity detected in {} for {:?} seconds. Killing JMeter...",
-                        &jtl_path,
+                        jtl_path,
                         inactivity_kill_timeout_secs.unwrap_or(0)
                     );
                     let _ = jmeter_process.kill(); // ignore error if already exited

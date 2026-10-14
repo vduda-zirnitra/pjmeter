@@ -7,10 +7,10 @@ authors = ["Victor Duda"]
 description = "A helping tool to execute JMeter test plans on any project"
 
 [dependencies]
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.49.0", features = ["full"] }
 clap = { version = "4.5.57", features = ["derive", "cargo"] }
 anyhow = "1.0.99"
-chrono = "0.4.41"
+chrono = "0.4.43"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "macros", "chrono"] }
 dirs = "6.0.0"
 toml = "0.9.5"
@@ -19,7 +19,7 @@ reqwest = { version = "0.12.23", features = ["blocking", "json", "stream"] }
 tempfile = "3.20.0"
 zip = "6.0.0"
 [target.'cfg(unix)'.dependencies]
-uzers = "0.11.0"
+uzers = "0.12.2"
 libc = "0.2.174"
 indicatif = "0.18.0"
 dialoguer = "0.12.0"
