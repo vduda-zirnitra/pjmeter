@@ -94,7 +94,7 @@ jobs:
           echo "artifact_name=$(basename $ARTIFACT_FILE)" >> $GITHUB_OUTPUT
 
       - name: Upload artifact to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ${{ steps.find_artifact.outputs.artifact_file }}
           generate_release_notes: true
